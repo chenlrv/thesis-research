@@ -3,7 +3,7 @@ import imageio.v2 as iio
 import napari
 from pathlib import Path
 
-DATA_PATH_TEMPLATE = 'D:/thesis_research/resources/{section_id}'
+DATA_PATH_TEMPLATE = 'D:/thesis_research_sandbox/resources/{section_id}'
 S10_SECTION_DIR = DATA_PATH_TEMPLATE.format(section_id='GSM8199188_ID61-ID62_S10')
 S18_SECTION_DIR = DATA_PATH_TEMPLATE.format(section_id='GSM8199189_ID67-ID68_S18')
 

@@ -13,7 +13,7 @@ SECTIONS = [
     'GSM8199188_ID61-ID62_S10',
     'GSM8199189_ID67-ID68_S18'
 ]
-DATA_PATH_TEMPLATE = 'D:/thesis_research/resources/{section_id}'
+DATA_PATH_TEMPLATE = 'D:/thesis_research_sandbox/resources/{section_id}'
 
 
 def load_adata(section_id: str, section_number: int) -> AnnData:
