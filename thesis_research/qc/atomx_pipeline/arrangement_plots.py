@@ -1,6 +1,5 @@
-import pandas as pd
 import matplotlib.pyplot as plt
-
+import pandas as pd
 
 
 def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
@@ -20,7 +19,6 @@ def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
         .str.replace(r"^FOV[_ ]*", "", regex=True)
     )
     fov_df[FOV_COL] = pd.to_numeric(fov_df[FOV_COL], errors="coerce").astype("Int64")
-
 
     fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
 
@@ -42,5 +40,37 @@ def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, alpha=0.25)
 
+    plt.tight_layout()
+    plt.show()
+
+
+def generate_cells_with_area_plot(adata) -> None:
+    """Generate a scatter plot of cells colored by their area.
+
+    Args:
+        adata (AnnData): Annotated data matrix containing cell information.
+    """
+    import numpy as np
+
+    XCOL = "CenterX_global_px"
+    YCOL = "CenterY_global_px"
+    ACOL = "Area"
+
+    x = adata.obs[XCOL].to_numpy(float)
+    y = adata.obs[YCOL].to_numpy(float)
+    a = adata.obs[ACOL].to_numpy(float)
+
+    m = np.isfinite(x) & np.isfinite(y) & np.isfinite(a)
+
+    # Clip color scale to make it readable (1st–99th percentile)
+    vmin, vmax = np.percentile(a[m], [1, 99])
+
+    plt.figure(figsize=(6, 6), dpi=400)
+    sc = plt.scatter(x[m], y[m], c=a[m], s=0.15, linewidths=0, vmin=vmin, vmax=vmax, cmap="viridis_r")
+    plt.xlabel("Global X Position (px)")
+    plt.ylabel("Global Y Position (px)")
+    plt.title("Cell area (1–99% percentile)", {"fontsize": 16, "fontweight": "bold"})
+    plt.gca().set_aspect("equal", adjustable="box")
+    plt.colorbar(sc, label=ACOL)
     plt.tight_layout()
     plt.show()
