@@ -1,0 +1,16 @@
+2 samples
+for every sample there are 2 slides
+
+we are using 3 mice - we have 2 brains with tumors, and one brain for control, without tumors
+using H&E staining we can identify the tumor regions in the brains with tumors
+
+2 brains with tumors
+1. L3-4 with bigger tumors
+2. L3-21 with smaller tumors (bioinfomatic analysis got less cells than L3-4)
+
+what are the marker genes for tumor cells?
+
+
+
+annotate cell type
+every cell type annotation should include confidence level for the annotation
