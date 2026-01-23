@@ -5,7 +5,6 @@ import anndata as ad
 import squidpy as sq
 from anndata import AnnData
 
-from resources.L34.L34_fov_slices import one, two, three
 from thesis_research.qc_pipeline.arrangement_plots import (
     generate_fov_arrangement_plot,
     generate_cells_with_area_plot,
@@ -16,8 +15,12 @@ from thesis_research.qc_pipeline.qc_plots import (
     _generate_scatter_plots,
     _generate_histograms,
 )
-from thesis_research.qc_pipeline.utils import subset_adata_by_fovs
-from thesis_research.utils.constants import COSMX_RAW_DATA_DIR, ADATA_FILE_PATTERN
+from thesis_research.qc_pipeline.utils import subset_adata_by_fovs, load_slices_from_csv
+from thesis_research.utils.constants import (
+    COSMX_RAW_DATA_DIR,
+    ADATA_FILE_PATTERN,
+    FOV_SLICES_FILE_PATTERN,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,15 +35,15 @@ def run_pipeline() -> None:
         adata = _get_adata(
             sample_dir, adata_filename=ADATA_FILE_PATTERN.format(sample_id=sample_id)
         )
+        slices = load_slices_from_csv(
+            sample_dir / FOV_SLICES_FILE_PATTERN.format(sample_id=sample_id)
+        )
 
-        one_subset = subset_adata_by_fovs(adata, one)
-        two_subset = subset_adata_by_fovs(adata, two)
-
-        three_subset = subset_adata_by_fovs(adata, three)
-
-        general(one_subset)
-        general(two_subset)
-        general(three_subset)
+        slice_adatas = []
+        for slice_group in slices:
+            subset_adata = subset_adata_by_fovs(adata, slice_group)
+            general(subset_adata)
+            slice_adatas.append(subset_adata)
 
         # general(adata)
         generate_cells_with_area_plot(adata)
