@@ -1,6 +1,6 @@
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COSMX_RAW_DATA_DIR = PROJECT_ROOT / "resources"
 
 METADATA_FILE_PATTERN = "{sample_id}_metadata_file.csv"

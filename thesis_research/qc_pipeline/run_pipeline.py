@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import anndata as ad
 import squidpy as sq
@@ -21,12 +22,16 @@ from thesis_research.utils.constants import COSMX_RAW_DATA_DIR, ADATA_FILE_PATTE
 LOGGER = logging.getLogger(__name__)
 
 
-def run_pipeline():
+def run_pipeline() -> None:
     print("Starting QC pipeline...")
+
     for sample_dir in sorted(p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir()):
-        sample_id = sample_dir
-        print(f"Processing sample: {sample_id}")
-        adata = _get_adata(sample_id, adata_path=ADATA_FILE_PATTERN.format(sample_id))
+        sample_id = sample_dir.name
+        print(f"Processing sample {sample_id}...")
+
+        adata = _get_adata(
+            sample_dir, adata_filename=ADATA_FILE_PATTERN.format(sample_id=sample_id)
+        )
 
         one_subset = subset_adata_by_fovs(adata, one)
         two_subset = subset_adata_by_fovs(adata, two)
@@ -44,12 +49,15 @@ def run_pipeline():
         )
 
 
-def _get_adata(sample_id: str, adata_path: str = None) -> AnnData:
-    if adata_path:
-        adata = ad.read_h5ad(adata_path)
+def _get_adata(sample_dir_path: Path, adata_filename: str = None) -> AnnData:
+    if adata_filename:
+        adata = ad.read_h5ad(sample_dir_path / adata_filename)
     else:
-        adata = _load_adata(sample_id)
-
+        adata = _load_adata(sample_dir_path)
+        adata.write(
+            sample_dir_path / ADATA_FILE_PATTERN.format(sample_id=sample_dir_path.name),
+            compression="gzip",
+        )
     return adata
 
 
@@ -65,11 +73,12 @@ def qc(adata: AnnData) -> None:
     _generate_scatter_plots(adata)
 
 
-def _load_adata(sample_id: str) -> AnnData:
+def _load_adata(sample_dir: Path) -> AnnData:
+    sample_id = sample_dir.name
     print(f"Loading adata for section {sample_id}")
 
     adata = sq.read.nanostring(
-        path=DATA_PATH_TEMPLATE.format(section_id=sample_id),
+        path=sample_dir,
         counts_file=f"{sample_id}_exprMat_file.csv",
         meta_file=f"{sample_id}_metadata_file.csv",
         fov_file=f"{sample_id}_fov_positions_file.csv",
@@ -85,3 +94,6 @@ def _load_adata(sample_id: str) -> AnnData:
     )
 
     return adata
+
+
+run_pipeline()

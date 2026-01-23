@@ -4,8 +4,6 @@
 # qcFlagsCellArea - Cell failed QC due to abnormal area
 
 
-
-
 # qc(adata)
 
 # At the cell level, look for transcripts per cell > ~200. If too many cells are flagged (30% or more), consider
@@ -30,4 +28,3 @@
 # o Neighbors = 30; keep between 20-40; higher value yields more distinct clusters.
 # o Metric = cosine.
 # o Use between 15-50 principal components.
-
