@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
 
-_COLOR = '#F8766D'
+_COLOR = "#F8766D"
 
 
 def _generate_violin_plots(adata, keys):

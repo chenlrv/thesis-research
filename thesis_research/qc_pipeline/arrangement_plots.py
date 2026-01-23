@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
+def generate_fov_arrangement_plot(
+    fov_positions_path: str, faulty_fovs=None, faulty_color="#d95f5f"
+) -> None:
     """Generate a plot showing the arrangement of FOVs based on their global positions.
 
     Args:
@@ -14,10 +16,7 @@ def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
     X_COL = "x_global_px"
     Y_COL = "y_global_px"
 
-    fov_df[FOV_COL] = (
-        fov_df[FOV_COL].astype(str)
-        .str.replace(r"^FOV[_ ]*", "", regex=True)
-    )
+    fov_df[FOV_COL] = fov_df[FOV_COL].astype(str).str.replace(r"^FOV[_ ]*", "", regex=True)
     fov_df[FOV_COL] = pd.to_numeric(fov_df[FOV_COL], errors="coerce").astype("Int64")
 
     fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
@@ -26,7 +25,19 @@ def generate_fov_arrangement_plot(fov_positions_path: str) -> None:
     y = fov_df[Y_COL].to_numpy(float)
     labels = fov_df[FOV_COL].to_numpy()
 
-    ax.scatter(x, y, s=100, marker="s", c="#cfe8f3", edgecolors="none")
+    faulty_set = set(int(f) for f in faulty_fovs) if faulty_fovs is not None else set()
+    is_faulty = fov_df[FOV_COL].isin(faulty_set).to_numpy()
+
+    ax.scatter(x[~is_faulty], y[~is_faulty], s=100, marker="s", c="#cfe8f3", edgecolors="none")
+    ax.scatter(
+        x[is_faulty],
+        y[is_faulty],
+        s=110,
+        marker="s",
+        c=faulty_color,
+        edgecolors="black",
+        linewidths=0.6,
+    )
 
     for xi, yi, label in zip(x, y, labels):
         if pd.isna(label):
@@ -66,7 +77,7 @@ def generate_cells_with_area_plot(adata) -> None:
     vmin, vmax = np.percentile(a[m], [1, 99])
 
     plt.figure(figsize=(6, 6), dpi=400)
-    sc = plt.scatter(x[m], y[m], c=a[m], s=0.15, linewidths=0, vmin=vmin, vmax=vmax, cmap="viridis_r")
+    sc = plt.scatter(x[m], y[m], c=a[m], s=0.15, linewidths=0, vmin=vmin, vmax=vmax)
     plt.xlabel("Global X Position (px)")
     plt.ylabel("Global Y Position (px)")
     plt.title("Cell area (1–99% percentile)", {"fontsize": 16, "fontweight": "bold"})
