@@ -2,7 +2,7 @@ import numpy as np
 from anndata import AnnData
 from sklearn.neighbors import NearestNeighbors
 
-from thesis_research.qc_pipeline.arrangement_plots import plot_fov_positions
+from thesis_research.qc_pipeline.position_plots import plot_fov_positions
 from thesis_research.utils.columns import AdataObs, SAMPLE_ID
 from thesis_research.utils.entity_type import get_output_dir
 

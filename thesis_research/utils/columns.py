@@ -53,3 +53,7 @@ class FovPositionsCol(str, Enum):
     FOV = FOV
     X_GLOBAL_PX = X_GLOBAL_PX
     Y_GLOBAL_PX = Y_GLOBAL_PX
+    SLICE_ID = "slice_ID"
+
+
+SLICE_ID = FovPositionsCol.SLICE_ID

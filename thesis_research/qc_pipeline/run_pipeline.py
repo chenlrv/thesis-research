@@ -5,7 +5,7 @@ import anndata as ad
 import squidpy as sq
 from anndata import AnnData
 
-from thesis_research.qc_pipeline.arrangement_plots import plot_positions
+from thesis_research.qc_pipeline.position_plots import generate_position_plots
 
 from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
 
@@ -34,9 +34,8 @@ def run_pipeline(fov_qc: bool = False) -> None:
 
         adata = _get_adata(sample_id)
 
-        plot_positions(adata, run_id)
-
         slices = load_slices_from_csv(sample_id)
+        generate_position_plots(adata, slices, run_id)
 
         slice_adatas = []
         for slice_group in slices:
