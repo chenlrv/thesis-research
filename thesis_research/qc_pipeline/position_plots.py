@@ -96,14 +96,14 @@ def plot_fov_positions_sliced(
     fov_labels = fov_df[FOV].to_numpy()
     slice_index = fov_df[SLICE_ID].to_numpy(int)
 
-    slice_colors = ["lavender", "orange", "green", "dodgerblue", "gold", "purple", "magenta"]
+    rng = np.random.default_rng()
+    slice_to_color = {si: rng.random(3) for si in np.unique(slice_index)}
 
     for i in np.unique(slice_index):
         m = slice_index == i
         if not np.any(m):
             continue
-        color = slice_colors[i % len(slice_colors)]
-        ax.scatter(x[m], y[m], s=100, marker="s", c=color, edgecolors="none")
+        ax.scatter(x[m], y[m], s=100, marker="s", c=[slice_to_color[i]], edgecolors="none")
 
     for xi, yi, label in zip(x, y, fov_labels):
         if pd.isna(label):

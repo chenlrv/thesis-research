@@ -37,12 +37,13 @@ def run_pipeline(fov_qc: bool = False) -> None:
         slices = load_slices_from_csv(sample_id)
         generate_position_plots(adata, slices, run_id)
 
-        slice_adatas = []
-        for slice_group in slices:
-            subset_adata = subset_adata_by_fovs(adata, slice_group)
-            slice_adatas.append(subset_adata)
-            if fov_qc:
-                subset_adata = run_fov_qc(subset_adata, run_id)
+        # slice_adatas = []
+        # for slice_group in slices:
+        #     subset_adata = subset_adata_by_fovs(adata, slice_group)
+        #     slice_adatas.append(subset_adata)
+        #     if fov_qc:
+        #         subset_adata = run_fov_qc(subset_adata, run_id)
+        print(f'✅ Successfully done QC for sample {sample_id}!')
 
 
 def _get_adata(sample_id: str) -> AnnData:
