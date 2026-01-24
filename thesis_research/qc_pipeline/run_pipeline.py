@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 import anndata as ad
 import squidpy as sq
@@ -9,41 +8,39 @@ from thesis_research.qc_pipeline.arrangement_plots import (
     generate_fov_arrangement_plot,
     generate_cells_with_area_plot,
 )
-from thesis_research.qc_pipeline.fov_qc_plots import general
+from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
+
 from thesis_research.qc_pipeline.qc_plots import (
     _generate_violin_plots,
     _generate_scatter_plots,
     _generate_histograms,
 )
 from thesis_research.qc_pipeline.utils import subset_adata_by_fovs, load_slices_from_csv
-from thesis_research.utils.constants import (
-    COSMX_RAW_DATA_DIR,
-    ADATA_FILE_PATTERN,
-    FOV_SLICES_FILE_PATTERN,
-)
+from thesis_research.utils.columns import AdataUns
+from thesis_research.utils.constants import COSMX_RAW_DATA_DIR
+
+from thesis_research.utils.entity_type import EntityType, get_path
 
 LOGGER = logging.getLogger(__name__)
 
 
-def run_pipeline() -> None:
+def run_pipeline(fov_qc: bool = False) -> None:
     print("Starting QC pipeline...")
 
     for sample_dir in sorted(p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir()):
         sample_id = sample_dir.name
         print(f"Processing sample {sample_id}...")
 
-        adata = _get_adata(
-            sample_dir, adata_filename=ADATA_FILE_PATTERN.format(sample_id=sample_id)
-        )
-        slices = load_slices_from_csv(
-            sample_dir / FOV_SLICES_FILE_PATTERN.format(sample_id=sample_id)
-        )
+        adata = _get_adata(sample_id)
+
+        slices = load_slices_from_csv(sample_id)
 
         slice_adatas = []
         for slice_group in slices:
             subset_adata = subset_adata_by_fovs(adata, slice_group)
-            general(subset_adata)
             slice_adatas.append(subset_adata)
+            if fov_qc:
+                subset_adata = run_fov_qc(subset_adata)
 
         # general(adata)
         generate_cells_with_area_plot(adata)
@@ -52,15 +49,15 @@ def run_pipeline() -> None:
         )
 
 
-def _get_adata(sample_dir_path: Path, adata_filename: str = None) -> AnnData:
-    if adata_filename:
-        adata = ad.read_h5ad(sample_dir_path / adata_filename)
+def _get_adata(sample_id: str) -> AnnData:
+    adata_file_path = get_path(EntityType.ADATA_FILE, sample_id)
+
+    if adata_file_path.exists():
+        adata = ad.read_h5ad(adata_file_path)
     else:
-        adata = _load_adata(sample_dir_path)
-        adata.write(
-            sample_dir_path / ADATA_FILE_PATTERN.format(sample_id=sample_dir_path.name),
-            compression="gzip",
-        )
+        adata = _load_adata(sample_id)
+        adata.write(adata_file_path, compression="gzip")
+
     return adata
 
 
@@ -76,17 +73,17 @@ def qc(adata: AnnData) -> None:
     _generate_scatter_plots(adata)
 
 
-def _load_adata(sample_dir: Path) -> AnnData:
-    sample_id = sample_dir.name
-    print(f"Loading adata for section {sample_id}")
+def _load_adata(sample_id: str) -> AnnData:
+    print(f"Loading adata for sample {sample_id}")
 
+    sample_dir = get_path(EntityType.SAMPLE_DIR, sample_id)
     adata = sq.read.nanostring(
         path=sample_dir,
         counts_file=f"{sample_id}_exprMat_file.csv",
         meta_file=f"{sample_id}_metadata_file.csv",
         fov_file=f"{sample_id}_fov_positions_file.csv",
     )
-    adata.uns["section_id"] = sample_id
+    adata.uns[AdataUns.SAMPLE_ID] = sample_id
 
     print(
         f"Adata {sample_id} initial shapes:\n"

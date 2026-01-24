@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class AdataCol(str, Enum):
+class AdataObs(str, Enum):
     FOV = "fov"
     SLIDE_ID = "slide_ID"
     N_COUNT_RNA = "nCount_RNA"
@@ -14,3 +14,13 @@ class AdataCol(str, Enum):
     CENTER_X_GLOBAL_PX = "CenterX_global_px"
     CENTER_Y_GLOBAL_PX = "CenterY_global_px"
     AREA = "Area"
+
+
+class AdataUns(str, Enum):
+    SAMPLE_ID = "sample_id"
+
+
+class FovSlicesCol(str, Enum):
+    SLICE = "slice"
+    START = "start"
+    END = "end"

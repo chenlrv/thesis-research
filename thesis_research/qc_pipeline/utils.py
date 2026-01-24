@@ -2,16 +2,17 @@ import numpy as np
 from anndata import AnnData
 import pandas as pd
 
+from thesis_research.utils.columns import AdataObs, FovSlicesCol
+from thesis_research.utils.constants import FOV_SLICES_FILE_PATH, COSMX_RAW_DATA_DIR
 
-def q(x, percentile):
-    return x.quantile(percentile)
 
+def load_slices_from_csv(sample_id: str) -> list[list[range]]:
+    fov_slices_file_path = FOV_SLICES_FILE_PATH.format(root=COSMX_RAW_DATA_DIR, sample_id=sample_id)
 
-def load_slices_from_csv(path: str) -> list[list[range]]:
-    df = pd.read_csv(path)
+    df = pd.read_csv(fov_slices_file_path)
     tuples_by_slice = (
-        df.sort_values(["slice", "start"])
-        .groupby("slice")[["start", "end"]]
+        df.sort_values([FovSlicesCol.SLICE, FovSlicesCol.START])
+        .groupby(FovSlicesCol.SLICE)[[FovSlicesCol.START, FovSlicesCol.END]]
         .apply(lambda group: [tuple(x) for x in group.to_numpy()])
         .tolist()
     )
@@ -19,6 +20,6 @@ def load_slices_from_csv(path: str) -> list[list[range]]:
 
 
 def subset_adata_by_fovs(adata: AnnData, fov_ranges: list[range]) -> AnnData:
-    fov_vals = adata.obs["fov"].astype(int).to_numpy()
+    fov_vals = adata.obs[AdataObs.FOV].astype(int).to_numpy()
     mask = np.array([any(v in r for r in fov_ranges) for v in fov_vals], dtype=bool)
     return adata[mask].copy()

@@ -4,22 +4,19 @@ from anndata import AnnData
 from sklearn.neighbors import NearestNeighbors
 
 from thesis_research.qc_pipeline.arrangement_plots import generate_fov_arrangement_plot
+from thesis_research.utils.columns import AdataObs
 
 
-def general(adata: AnnData) -> pd.DataFrame:
-    # 0) Load barcodemap (CSV you saved)
+def run_fov_qc(adata: AnnData) -> AnnData:
     barcodemap = pd.read_csv("/resources/barcodemap_Mm_UCC.csv")
     barcodemap["gene"] = barcodemap["gene"].astype(str)
     barcodemap["barcode"] = barcodemap["barcode"].astype(str)
 
-    # 1) Build inputs from adata
-    xy = adata.obs[["CenterX_global_px", "CenterY_global_px"]].to_numpy()
-    fov = adata.obs["fov"].to_numpy()
+    xy = adata.obs[[AdataObs.CENTER_X_GLOBAL_PX, AdataObs.CENTER_Y_GLOBAL_PX]].to_numpy()
+    fov = adata.obs[AdataObs.FOV].to_numpy()
 
-    # 2) Make grid (cells -> grid squares)
     grid_id, grid_fov = make_grid(xy=xy, fov=fov, squares_per_fov=49, min_cells_per_square=10)
 
-    # ---- Sanity checks: grid ----
     keep_frac = np.mean(np.array(grid_id, dtype=object) != None)
     print("GRID: cells kept in valid squares:", keep_frac)
 
@@ -28,12 +25,10 @@ def general(adata: AnnData) -> pd.DataFrame:
     print("GRID: #unique FOVs:", pd.Series(fov).nunique())
     print("GRID: grid_fov mapping size:", len(grid_fov))
 
-    # 3) Build grid×bitcounts (normalized) (this calls grid_mean_gene_expression + gene×bit mapping inside)
     grid_ids, bitcounts, bit_names = grid_bitcounts_from_adata(
         adata=adata, grid_id=grid_id, barcodemap_df=barcodemap
     )
 
-    # ---- Sanity checks: barcodemap ----
     print("\nBARCODES: barcode length counts (top):")
     print(barcodemap["barcode"].str.len().value_counts().head())
 
@@ -43,7 +38,6 @@ def general(adata: AnnData) -> pd.DataFrame:
     overlap = len(set(barcodemap["gene"]) & set(adata.var_names.astype(str)))
     print("BARCODES: gene overlap with adata:", overlap, "out of", adata.n_vars)
 
-    # ---- Sanity checks: bitcounts ----
     print("\nBITCOUNTS: shape:", bitcounts.shape, "(n_grids, n_bits)")
     print("BITCOUNTS: n_bits from names:", len(bit_names))
 
@@ -57,18 +51,15 @@ def general(adata: AnnData) -> pd.DataFrame:
     col_sums = bitcounts.sum(axis=0)
     print("BITCOUNTS: bits with zero total:", int((col_sums == 0).sum()), "out of", len(col_sums))
 
-    # 4) Build comparator neighbors across FOVs
     grid_fov_vec = np.array([grid_fov[g] for g in grid_ids], dtype=object)
 
     comparators = get_nearest_neighbors_by_fov(
         x=bitcounts, grid_fov_vec=grid_fov_vec, n_neighbors=10
     )
 
-    # ---- Sanity checks: comparators ----
     print("\nCOMPARATORS: shape:", comparators.shape)
     print("COMPARATORS: missing fraction (=-1):", (comparators == -1).mean())
 
-    # check no same-FOV comparator
     bad = 0
     total = 0
     for i in range(comparators.shape[0]):
@@ -79,20 +70,6 @@ def general(adata: AnnData) -> pd.DataFrame:
         bad += int(np.sum(grid_fov_vec[nbrs] == grid_fov_vec[i]))
         total += int(nbrs.size)
     print("COMPARATORS: same-FOV comparator count (should be 0):", bad, "out of", total)
-
-    # check max 1 per other FOV (uniqueness)
-    viol = 0
-    checked = 0
-    for i in range(comparators.shape[0]):
-        nbrs = comparators[i]
-        nbrs = nbrs[nbrs >= 0]
-        if nbrs.size == 0:
-            continue
-        checked += 1
-        fovs_nbr = grid_fov_vec[nbrs]
-        if len(set(fovs_nbr)) != len(fovs_nbr):
-            viol += 1
-    print("COMPARATORS: rows violating '1 per other FOV' (should be 0):", viol, "checked:", checked)
 
     (
         totalcounts_grid,
@@ -118,14 +95,12 @@ def general(adata: AnnData) -> pd.DataFrame:
     resid = compute_bit_residuals(bitcounts, comparators)
     print("resid shape:", resid.shape, "min/max:", float(np.min(resid)), float(np.max(resid)))
 
-    # 6.2) summarize to FOV×bit bias + flags
     max_prop_loss = 0.6
     fovstats = summarize_fov_bias(resid, grid_fov_vec, bit_names, max_prop_loss=max_prop_loss)
 
     print("fovstats['flag'] shape:", fovstats["flag"].shape)
     print("total flagged (fov,bit) pairs:", int(fovstats["flag"].to_numpy().sum()))
 
-    # 6.3) collapse bits -> reporter cycles and get flagged FOVs for bias
     flags_per_fov_x_reportercycle, flagged_fovs_forbias = flags_per_fov_reportercycle_and_fovs(
         fovstats["flag"]
     )
@@ -145,7 +120,8 @@ def general(adata: AnnData) -> pd.DataFrame:
         faulty_fovs=flagged_fovs,
     )
 
-    print("h")
+    new_adata = adata.copy()
+    return new_adata[[~AdataObs.FOV in flagged_fovs]]
 
 
 def make_grid(
