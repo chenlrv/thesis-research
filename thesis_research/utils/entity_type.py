@@ -1,5 +1,6 @@
 from enum import Enum
 from pathlib import Path
+import uuid
 
 from thesis_research.utils.constants import (
     ADATA_FILE_PATH,
@@ -7,6 +8,7 @@ from thesis_research.utils.constants import (
     FOV_POSITIONS_FILE_PATH,
     FOV_SLICES_FILE_PATH,
     SAMPLE_DIR_PATH,
+    OUTPUTS_DIR,
 )
 
 
@@ -31,3 +33,11 @@ def get_path(entity_type: EntityType, sample_id: str) -> Path:
         return Path(template.format(resources=COSMX_RAW_DATA_DIR, sample_id=sample_id))
     except KeyError:
         raise ValueError(f"Unsupported type: {entity_type}")
+
+
+def get_output_dir(sample_id: str, run_id: str = None) -> Path:
+    run_id = run_id or str(uuid.uuid4())
+    sample_output_dir = OUTPUTS_DIR / sample_id / run_id
+    sample_output_dir.mkdir(parents=True, exist_ok=True)
+
+    return sample_output_dir

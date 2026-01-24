@@ -1,13 +1,16 @@
 import numpy as np
-import pandas as pd
 from anndata import AnnData
 from sklearn.neighbors import NearestNeighbors
 
-from thesis_research.qc_pipeline.arrangement_plots import generate_fov_arrangement_plot
-from thesis_research.utils.columns import AdataObs
+from thesis_research.qc_pipeline.arrangement_plots import plot_fov_positions
+from thesis_research.utils.columns import AdataObs, SAMPLE_ID
+from thesis_research.utils.entity_type import get_output_dir
 
 
-def run_fov_qc(adata: AnnData) -> AnnData:
+def run_fov_qc(adata: AnnData, run_id: str) -> AnnData:
+    sample_id = adata.uns[SAMPLE_ID]
+    output_dir = get_output_dir(sample_id, run_id)
+
     barcodemap = pd.read_csv("/resources/barcodemap_Mm_UCC.csv")
     barcodemap["gene"] = barcodemap["gene"].astype(str)
     barcodemap["barcode"] = barcodemap["barcode"].astype(str)
@@ -115,8 +118,9 @@ def run_fov_qc(adata: AnnData) -> AnnData:
 
     flagged_fovs = sorted(set(flagged_fovs_fortotalcounts) | set(flagged_fovs_forbias))
 
-    generate_fov_arrangement_plot(
-        fov_positions_path="/resources/L34/L34_fov_positions_file.csv",
+    plot_fov_positions(
+        sample_id=sample_id,
+        output_dir=output_dir,
         faulty_fovs=flagged_fovs,
     )
 

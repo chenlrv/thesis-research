@@ -2,7 +2,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COSMX_RAW_DATA_DIR = PROJECT_ROOT / "resources"
-
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 
 SAMPLE_DIR_PATH = "{resources}/{sample_id}"
 METADATA_FILE_PATH = "{resources}/{sample_id}/{sample_id}_metadata_file.csv"
