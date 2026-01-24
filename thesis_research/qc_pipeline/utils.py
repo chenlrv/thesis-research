@@ -25,8 +25,5 @@ def load_slices_from_csv(sample_id: str) -> list[SampleSlice]:
 
 
 def subset_adata_by_fovs(adata: AnnData, sample_slice: SampleSlice) -> AnnData:
-    fov_vals = adata.obs[FOV].astype(int).to_numpy()
-    mask = np.array(
-        [any(v in fov_id for fov_id in sample_slice.fov_ids) for v in fov_vals], dtype=bool
-    )
+    mask = adata.obs[FOV].astype(int).isin(sample_slice.fov_ids).to_numpy()
     return adata[mask].copy()

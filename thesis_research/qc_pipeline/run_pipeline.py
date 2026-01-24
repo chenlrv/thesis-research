@@ -5,15 +5,11 @@ import anndata as ad
 import squidpy as sq
 from anndata import AnnData
 
+from thesis_research.qc_pipeline.cell_qc_plots import run_cell_qc
 from thesis_research.qc_pipeline.position_plots import generate_position_plots
 
 from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
 
-from thesis_research.qc_pipeline.qc_plots import (
-    _generate_violin_plots,
-    _generate_scatter_plots,
-    _generate_histograms,
-)
 from thesis_research.qc_pipeline.utils import subset_adata_by_fovs, load_slices_from_csv
 from thesis_research.utils.columns import SAMPLE_ID
 from thesis_research.utils.constants import COSMX_RAW_DATA_DIR
@@ -23,7 +19,7 @@ from thesis_research.utils.entity_type import EntityType, get_path
 LOGGER = logging.getLogger(__name__)
 
 
-def run_pipeline(fov_qc: bool = False) -> None:
+def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
     run_id = str(uuid.uuid4())
 
     print(f"Starting QC pipeline run = {run_id}...")
@@ -33,16 +29,21 @@ def run_pipeline(fov_qc: bool = False) -> None:
         print(f"Processing sample {sample_id}...")
 
         adata = _get_adata(sample_id)
-
         slices = load_slices_from_csv(sample_id)
-        generate_position_plots(adata, slices, run_id)
 
-        # slice_adatas = []
-        # for slice_group in slices:
-        #     subset_adata = subset_adata_by_fovs(adata, slice_group)
-        #     slice_adatas.append(subset_adata)
-        #     if fov_qc:
-        #         subset_adata = run_fov_qc(subset_adata, run_id)
+        if position_plots:
+            generate_position_plots(adata, slices, run_id)
+
+        slice_adatas = []
+        for sample_slice in slices:
+            subset_adata = subset_adata_by_fovs(adata, sample_slice)
+            slice_adatas.append(subset_adata)
+            if fov_qc:
+                subset_adata = run_fov_qc(subset_adata, run_id)
+
+            run_cell_qc(subset_adata, sample_id, sample_slice, run_id)
+
+
         print(f'✅ Successfully done QC for sample {sample_id}!')
 
 
@@ -67,18 +68,6 @@ def _get_adata(sample_id: str) -> AnnData:
     )
 
     return adata
-
-
-def qc(adata: AnnData) -> None:
-    adata.obs["Identity"] = "C"
-    x = adata.obs["propNegative"].astype(float)
-    adata.obs["percent.NegPrb"] = x * 100 if x.max() <= 1.0 else x
-
-    keys = ["nFeature_RNA", "nCount_RNA", "percent.NegPrb", "Area"]
-
-    _generate_histograms(adata, keys)
-    _generate_violin_plots(adata, keys)
-    _generate_scatter_plots(adata)
 
 
 def _load_adata(sample_id: str) -> AnnData:
