@@ -110,7 +110,7 @@ def plot_fov_positions_sliced(
             continue
         ax.text(xi, yi, str(label), ha="center", va="center", fontsize=3, color="black")
 
-    ax.set_title(f"{sample_id} FOV Positions", fontsize=16, fontweight="bold")
+    ax.set_title(f"{sample_id} FOV Positions Sliced", fontsize=16, fontweight="bold")
     ax.set_xlabel("Global X Position (px)")
     ax.set_ylabel("Global Y Position (px)")
 
