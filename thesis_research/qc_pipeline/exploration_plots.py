@@ -5,8 +5,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
 
-from thesis_research.utils.columns import PROP_NEGATIVE, PERCENT_NEGPRB, N_FEATURE_RNA, N_COUNT_RNA, AREA, SAMPLE_ID, \
-    SLIDE_ID
+from thesis_research.utils.columns import (
+    PROP_NEGATIVE,
+    PERCENT_NEGPRB,
+    N_FEATURE_RNA,
+    N_COUNT_RNA,
+    AREA,
+    SAMPLE_ID,
+    SLIDE_ID,
+)
 from thesis_research.utils.entity_type import get_output_dir
 
 
@@ -24,7 +31,9 @@ def run_exploration(adata: AnnData, sample_id: str, sample_slice: str, run_id: s
     _generate_scatter_plots(adata)
 
 
-def _generate_histogram(adata: AnnData, sample_id: str, sample_slice: str, feature: str, output_dir: Path):
+def _generate_histogram(
+    adata: AnnData, sample_id: str, sample_slice: str, feature: str, output_dir: Path
+):
     x = adata.obs[feature].to_numpy(dtype=float)
 
     fig = plt.figure()
@@ -32,7 +41,9 @@ def _generate_histogram(adata: AnnData, sample_id: str, sample_slice: str, featu
     plt.xlabel(feature)
     plt.ylabel("Number of cells")
     plt.title(f"{sample_id} slice {sample_slice} {feature} Histogram")
-    plt.savefig(output_dir / f"sample_{sample_slice}_{feature}_histogram.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        output_dir / f"sample_{sample_slice}_{feature}_histogram.png", dpi=300, bbox_inches="tight"
+    )
     plt.close(fig)
 
 
@@ -94,4 +105,3 @@ def _corrcoef(x, y):
     if m.sum() < 3:
         return np.nan
     return np.corrcoef(x[m], y[m])[0, 1]
-

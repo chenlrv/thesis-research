@@ -10,21 +10,27 @@ from thesis_research.utils.columns import N_COUNT_RNA, LOW_RNA_COUNT
 from thesis_research.utils.entity_type import get_output_dir
 
 
-def run_cell_qc(adata: AnnData, sample_id:str, sample_slice: SampleSlice, run_id: str) -> AnnData:
+def run_cell_qc(adata: AnnData, sample_id: str, sample_slice: SampleSlice, run_id: str) -> AnnData:
     print("Generating cell QC plots...")
     adata_counts = adata.obs[N_COUNT_RNA]
     threshold, flag = _low_count_flag(adata_counts)
-    _generate_log2_count_cutoff_histogram(sample_id, sample_slice, adata_counts, threshold, flag, get_output_dir(sample_id, run_id))
-    
+    _generate_log2_count_cutoff_histogram(
+        sample_id, sample_slice, adata_counts, threshold, flag, get_output_dir(sample_id, run_id)
+    )
+
     num_cells_to_remove = flag.sum()
     total_cells = len(flag)
-    print(f"Filtering out {num_cells_to_remove} of {total_cells} cells by count threshold ({threshold:.2f}), ({((num_cells_to_remove / total_cells) * 100):.2f}%) based on low RNA counts.")
+    print(
+        f"Filtering out {num_cells_to_remove} of {total_cells} cells by count threshold ({threshold:.2f}), ({((num_cells_to_remove / total_cells) * 100):.2f}%) based on low RNA counts."
+    )
 
     adata.obs[LOW_RNA_COUNT] = flag
     return adata[~adata.obs[LOW_RNA_COUNT]].copy()
 
 
-def _low_count_flag(counts: np.ndarray, quantile: float = 0.05, cap: int = 20) -> tuple[float, np.ndarray]:
+def _low_count_flag(
+    counts: np.ndarray, quantile: float = 0.05, cap: int = 20
+) -> tuple[float, np.ndarray]:
     """
     Generate a flag for low count cells.
     """
@@ -35,12 +41,13 @@ def _low_count_flag(counts: np.ndarray, quantile: float = 0.05, cap: int = 20) -
 
 
 def _generate_log2_count_cutoff_histogram(
-        sample_id: str,
-        sample_slice: SampleSlice,
-        adata_counts: pd.Series,
-        threshold: float,
-        flag: np.ndarray,
-        output_dir: Path) -> None:
+    sample_id: str,
+    sample_slice: SampleSlice,
+    adata_counts: pd.Series,
+    threshold: float,
+    flag: np.ndarray,
+    output_dir: Path,
+) -> None:
     """
     Generate a histogram of the log2 counts per cell.
     """
@@ -49,12 +56,14 @@ def _generate_log2_count_cutoff_histogram(
     total_cells = len(flag)
     textstr = f"Cells to filter: {num_cells_to_remove}/{total_cells} ({(num_cells_to_remove / total_cells) * 100:.1f}%)"
     plt.gca().text(
-        0.5, -0.25, textstr,
+        0.5,
+        -0.25,
+        textstr,
         transform=plt.gca().transAxes,
         fontsize=8,
-        verticalalignment='top',
-        horizontalalignment='center',
-        bbox=dict(boxstyle='round', facecolor='white', alpha=0.7)
+        verticalalignment="top",
+        horizontalalignment="center",
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7),
     )
 
     plt.hist(np.log2(adata_counts[adata_counts > 0]), bins=100)
@@ -63,10 +72,13 @@ def _generate_log2_count_cutoff_histogram(
     plt.ylabel("N cells")
     plt.title(f"{sample_id} slice {sample_slice.slice_id} Log2 counts per cell histogram")
     plt.legend([f"{flag.mean() * 100:.1f}% rejected"], loc="upper left")
-    plt.savefig(output_dir / f"slice_{sample_slice.slice_id}_log2_count_histogram.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        output_dir / f"slice_{sample_slice.slice_id}_log2_count_histogram.png",
+        dpi=300,
+        bbox_inches="tight",
+    )
 
     plt.close(fig)
-
 
 
 # qcFlagsCellCounts - Cell failed QC based on RNA count thresholds

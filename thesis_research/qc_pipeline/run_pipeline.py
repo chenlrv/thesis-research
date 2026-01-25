@@ -43,8 +43,7 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
 
             run_cell_qc(subset_adata, sample_id, sample_slice, run_id)
 
-
-        print(f'✅ Successfully done QC for sample {sample_id}!')
+        print(f"✅ Successfully done QC for sample {sample_id}!")
 
 
 def _get_adata(sample_id: str) -> AnnData:
