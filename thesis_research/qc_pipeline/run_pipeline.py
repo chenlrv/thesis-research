@@ -1,12 +1,14 @@
 import logging
 import uuid
 
+import anndata
 import anndata as ad
 import squidpy as sq
 from anndata import AnnData
 
+from thesis_research.qc_pipeline.analysis import extract_features_for_pca
 from thesis_research.qc_pipeline.cell_qc_plots import run_cell_qc
-from thesis_research.qc_pipeline.position_plots import generate_position_plots
+from thesis_research.qc_pipeline.position_plots import generate_position_plots, plot_counts_over_space
 
 from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
 
@@ -23,7 +25,7 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
     run_id = str(uuid.uuid4())
 
     print(f"Starting QC pipeline run = {run_id}...")
-
+    adatas = []
     for sample_dir in sorted(p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir()):
         sample_id = sample_dir.name
         print(f"Processing sample {sample_id}...")
@@ -37,13 +39,19 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
         slice_adatas = []
         for sample_slice in slices:
             subset_adata = subset_adata_by_fovs(adata, sample_slice)
-            slice_adatas.append(subset_adata)
             if fov_qc:
                 subset_adata = run_fov_qc(subset_adata, run_id)
 
-            run_cell_qc(subset_adata, sample_id, sample_slice, run_id)
+            subset_adata = run_cell_qc(subset_adata, sample_id, sample_slice, run_id)
+            slice_adatas.append(subset_adata)
 
+        adatas.append(anndata.concat(slice_adatas))
         print(f"✅ Successfully done QC for sample {sample_id}!")
+
+    analysis_adata = anndata.concat(adatas)
+    extract_features_for_pca(analysis_adata)
+
+
 
 
 def _get_adata(sample_id: str) -> AnnData:

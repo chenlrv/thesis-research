@@ -4,14 +4,12 @@ import pandas as pd
 # import scrublet as scr
 from anndata import AnnData
 
-from thesis_research.utils.columns import SAMPLE_ID
 
 
 def get_negative_system_probes(adata: AnnData) -> AnnData:
     """Extract negative and system control probes from the dataset."""
 
-    sample_id = adata.uns[SAMPLE_ID]
-    print(f"Checking for negative and system control probes for {adata.uns[SAMPLE_ID]}")
+    print(f"Checking for negative and system control probes...")
 
     negative_mask = adata.var_names.str.startswith("Negative")
     system_control_mask = adata.var_names.str.startswith("SystemControl")
@@ -21,7 +19,7 @@ def get_negative_system_probes(adata: AnnData) -> AnnData:
     probes = adata[:, combined_mask].copy()
 
     print(
-        f"Found {probes.n_vars} negative/system-control probes in {sample_id}: {list(probes.var_names)}"
+        f"Found {probes.n_vars} negative/system-control probes: {list(probes.var_names)}"
     )
 
     return probes
@@ -29,15 +27,13 @@ def get_negative_system_probes(adata: AnnData) -> AnnData:
 
 def remove_negative_system_probes(adata: AnnData, probes: AnnData) -> AnnData:
     """Remove negative and system control probes from the dataset."""
-    sample_id = adata.uns[SAMPLE_ID]
-
-    print(f"Removing negative and system probes from {sample_id}")
+    print(f"Removing negative and system probes...")
 
     if probes.n_vars > 0:
         probe_names = probes.var_names
         adata = adata[:, ~adata.var_names.isin(probe_names)].copy()
         print(
-            f"Removed {len(probe_names)} probes from Anndata {sample_id}.\n"
+            f"Removed {len(probe_names)} probes.\n"
             f" Final var count: {adata.n_vars}"
         )
 

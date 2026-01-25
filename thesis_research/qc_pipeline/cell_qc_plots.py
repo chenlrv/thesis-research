@@ -5,6 +5,7 @@ from anndata import AnnData
 import matplotlib.pyplot as plt
 import numpy as np
 
+from thesis_research.qc_pipeline.position_plots import plot_counts_over_space, plot_flagged_cells
 from thesis_research.qc_pipeline.sample_slice import SampleSlice
 from thesis_research.utils.columns import N_COUNT_RNA, LOW_RNA_COUNT
 from thesis_research.utils.entity_type import get_output_dir
@@ -24,7 +25,11 @@ def run_cell_qc(adata: AnnData, sample_id: str, sample_slice: SampleSlice, run_i
         f"Filtering out {num_cells_to_remove} of {total_cells} cells by count threshold ({threshold:.2f}), ({((num_cells_to_remove / total_cells) * 100):.2f}%) based on low RNA counts."
     )
 
+    # plot_counts_over_space(adata)
     adata.obs[LOW_RNA_COUNT] = flag
+
+    xy = adata.obsm['spatial_fov']
+    # plot_flagged_cells(xy, adata.obs[LOW_RNA_COUNT].to_numpy())
     return adata[~adata.obs[LOW_RNA_COUNT]].copy()
 
 
@@ -55,9 +60,10 @@ def _generate_log2_count_cutoff_histogram(
     num_cells_to_remove = flag.sum()
     total_cells = len(flag)
     textstr = f"Cells to filter: {num_cells_to_remove}/{total_cells} ({(num_cells_to_remove / total_cells) * 100:.1f}%)"
+    # Move text below the axis, but further down to avoid overlapping with xlabel
     plt.gca().text(
         0.5,
-        -0.25,
+        -0.35,  # was -0.25, move further down
         textstr,
         transform=plt.gca().transAxes,
         fontsize=8,

@@ -147,6 +147,91 @@ def plot_cells_positions_with_area(adata: AnnData, output_dir: Path) -> None:
     plt.close(fig)
 
 
+def plot_counts_over_space(
+    adata,
+    x_col="CenterX_global_px",
+    y_col="CenterY_global_px",
+    count_col="nCount_RNA",
+    vmin=10,
+    vmax=5000,
+    legendvals=(10, 100, 1000, 5000),
+    s=1,                 # dot size (matplotlib "s" is area in points^2)
+    cmap="inferno",
+):
+    """
+    Spatial scatter of cells colored by log2(total counts), with counts clamped to [vmin, vmax].
+    """
+
+    x = adata.obs[x_col].to_numpy(float)
+    y = adata.obs[y_col].to_numpy(float)
+    counts = adata.obs[count_col].to_numpy(float)
+
+    # clamp counts then log2-transform
+    c = np.clip(counts, vmin, vmax)
+    logc = np.log2(c)
+
+    # normalize to [0, 1] using the same logic as the R code
+    lo = np.log2(vmin)
+    hi = np.log2(vmax)
+    norm = (logc - lo) / (hi - lo)
+
+    # discrete 101-color palette like viridis_pal(...)(101)
+    palette = plt.get_cmap(cmap)(np.linspace(0, 1, 101))
+    idx = np.clip(np.rint(norm * 100).astype(int), 0, 100)
+    colors = palette[idx]
+
+    fig, ax = plt.subplots()
+    ax.scatter(x, y, s=s, c=colors, marker="o", linewidths=0)
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # legend colors computed with the same mapping
+    legendvals = np.asarray(legendvals, dtype=float)
+    lv = np.clip(legendvals, vmin, vmax)
+    lv_norm = (np.log2(lv) - lo) / (hi - lo)
+    lv_idx = np.clip(np.rint(lv_norm * 100).astype(int), 0, 100)
+    lv_colors = palette[lv_idx]
+
+    handles = [plt.Line2D([], [], linestyle="", marker="o", markersize=0, color="none")]
+    labels = ["Total counts:"]
+    handles += [plt.Line2D([], [], linestyle="", marker="o", markersize=6, color=col) for col in lv_colors]
+    labels += [str(int(v)) for v in legendvals]
+
+    ax.legend(handles, labels, loc="lower right", frameon=True)
+
+    plt.show()
+    return fig, ax
+
+
+def plot_flagged_cells(xy, flag, s=1):
+    """
+    xy   : (n_cells, 2) array-like of spatial coordinates
+    flag : boolean array (True = flagged)
+    """
+
+    xy = np.asarray(xy)
+    flag = np.asarray(flag)
+
+    colors = np.where(flag, "red", "lightgrey")
+
+    fig, ax = plt.subplots()
+    ax.scatter(xy[:, 1], xy[:, 0],  # reverse columns like xy[, 2:1]
+               s=s,
+               c=colors,
+               marker="o",
+               linewidths=0)
+
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    plt.show()
+
 def _add_slice_column(fov_df: pd.DataFrame, slices: list[SampleSlice]) -> pd.DataFrame:
     """Add a 'slice' column to the FOV DataFrame based on the provided slices."""
     fov_df = fov_df.copy()
