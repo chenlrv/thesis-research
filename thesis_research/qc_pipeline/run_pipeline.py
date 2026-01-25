@@ -55,7 +55,7 @@ def _get_adata(sample_id: str) -> AnnData:
         print("Loading cached adata...")
         adata = ad.read_h5ad(adata_file_path)
     else:
-        print("Loading adata from raw data...")
+        print("Loading adata from raw files...")
         adata = _load_adata(sample_id)
         adata.write(adata_file_path, compression="gzip")
 

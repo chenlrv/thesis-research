@@ -18,6 +18,7 @@ class AdataObs(str, Enum):
     CENTER_X_GLOBAL_PX = "CenterX_global_px"
     CENTER_Y_GLOBAL_PX = "CenterY_global_px"
     AREA = "Area"
+    LOW_RNA_COUNT = "low_count"
 
 
 SLIDE_ID = AdataObs.SLIDE_ID.value
@@ -29,6 +30,7 @@ PERCENT_NEGPRB = AdataObs.PERCENT_NEGPRB.value
 CENTER_X_GLOBAL_PX = AdataObs.CENTER_X_GLOBAL_PX.value
 CENTER_Y_GLOBAL_PX = AdataObs.CENTER_Y_GLOBAL_PX.value
 AREA = AdataObs.AREA.value
+LOW_RNA_COUNT = AdataObs.LOW_RNA_COUNT.value
 
 
 class AdataUns(str, Enum):

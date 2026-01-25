@@ -14,12 +14,12 @@ def load_slices_from_csv(sample_id: str) -> list[SampleSlice]:
 
     df = pd.read_csv(fov_slices_file_path)
     slices: list[SampleSlice] = []
-    for _, group in df.sort_values([SLICE, START]).groupby(SLICE):
+    for i, group in df.sort_values([SLICE, START]).groupby(SLICE):
         fov_ids: set[int] = set()
         for low, high in group[[START, END]].to_numpy():
             fov_ids.update(range(low, high + 1))
 
-        slices.append(SampleSlice(fov_ids))
+        slices.append(SampleSlice(i, fov_ids))
 
     return slices
 
