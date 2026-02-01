@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from anndata import AnnData
+from matplotlib.lines import Line2D
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +22,7 @@ from thesis_research.utils.entity_type import EntityType, get_path, get_output_d
 
 def generate_position_plots(adata: AnnData, slices: list[SampleSlice], run_id: str) -> None:
     print("Generating position plots...")
-    sample_id = adata.uns[SAMPLE_ID]
+    sample_id = adata.obs[SAMPLE_ID].iat[0]
     output_dir = get_output_dir(sample_id, run_id)
 
     plot_fov_positions(sample_id, output_dir)
@@ -110,6 +111,14 @@ def plot_fov_positions_sliced(
             continue
         ax.text(xi, yi, str(label), ha="center", va="center", fontsize=3, color="black")
 
+    handles = [
+        Line2D([0], [0], marker="s", linestyle="",
+               markerfacecolor=slice_to_color[sid], markeredgecolor="none",
+               markersize=10, label=sid)
+        for sid in np.unique(slice_index)
+    ]
+    ax.legend(handles=handles, title="Slice ID", loc="upper right", frameon=True)
+
     ax.set_title(f"{sample_id} FOV Positions Sliced", fontsize=16, fontweight="bold")
     ax.set_xlabel("Global X Position (px)")
     ax.set_ylabel("Global Y Position (px)")
@@ -124,7 +133,7 @@ def plot_fov_positions_sliced(
 
 def plot_cells_positions_with_area(adata: AnnData, output_dir: Path) -> None:
     """Generate a scatter plot of cells colored by their area."""
-    sample_id = adata.uns[SAMPLE_ID]
+    sample_id = adata.obs[SAMPLE_ID].iat[0]
 
     x = adata.obs[CENTER_X_GLOBAL_PX].to_numpy(float)
     y = adata.obs[CENTER_Y_GLOBAL_PX].to_numpy(float)

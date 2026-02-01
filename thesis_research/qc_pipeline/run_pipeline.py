@@ -21,7 +21,7 @@ from thesis_research.utils.entity_type import EntityType, get_path
 LOGGER = logging.getLogger(__name__)
 
 
-def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
+def run_pipeline(fov_qc: bool = False, position_plots: bool = True) -> None:
     run_id = str(uuid.uuid4())
 
     print(f"Starting QC pipeline run = {run_id}...")
@@ -39,7 +39,7 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = False) -> None:
 
         slice_adatas = []
         for sample_slice in slices:
-            slice_adata = get_slice_adata(adata, sample_id, sample_slice)
+            slice_adata = get_slice_adata(adata, sample_slice)
 
             if fov_qc:
                 slice_adata = run_fov_qc(slice_adata, run_id)
@@ -94,6 +94,7 @@ def _load_adata(sample_id: str) -> AnnData:
         fov_file=f"{sample_id}_fov_positions_file.csv",
     )
     adata.obs[SAMPLE_ID] = sample_id
+
     return adata
 
 

@@ -6,24 +6,16 @@ from anndata import AnnData
 from matplotlib import pyplot as plt
 
 from thesis_research.qc_pipeline.filters import get_negative_system_probes, remove_negative_system_probes
-import scipy.sparse as sp
 from scipy.io import mmwrite
 import pyreadr
 import umap
 import matplotlib.colors as mcolors
-from thesis_research.qc_pipeline.utils import load_slice_types_from_csv
-
-
-# def check():
-#     adata = anndata.read_h5ad('D:/thesis-research/resources/adata_new.h5ad')
-#     load_slice_types_from_csv()
-
 
 
 def copy_slice_info(source_adata: AnnData):
     source_adata = anndata.read_h5ad('D:/thesis-research/resources/adata_full.h5ad')
-    target_adata = anndata.read_h5ad('D:/thesis-research/resources/adata_slim.h5ad')
-    # Ensure `Run_Tissue_name` exists in both source and target
+    target_adata = anndata.read_h5ad('D:/thesis-research/resources/adata_slim.h5ad') #todo load adata_new here and copy slice info from source_adata, so it will hold everything
+
     if "cell_id_unique" not in source_adata.obs.columns or "cell_id_unique" not in target_adata.obs.columns:
         raise KeyError("Both source and target AnnData must have 'cell_id_unique' in .obs")
 
@@ -104,13 +96,17 @@ def run_pca(adata: AnnData):
     )
 
 
-def run_umap():
-    res = pyreadr.read_r("D:\\thesis-research\\resources\\X_pca_pearson.rds")
-    X_pca = next(iter(res.values()))  # usually a pandas DataFrame
+def run_umap(metadata: pd.DataFrame) -> AnnData:
+    print('Starting umap')
+    pca_df =  pd.read_csv(
+        "D:/thesis-research/resources/X_pca_pearson_batch.csv", index_col=0
+    )
+    X_pca = pca_df.to_numpy(dtype=np.float32)
+    cell_ids = pca_df.index.to_numpy()
+    print(X_pca.shape, cell_ids[:3])
 
-    # make it a numpy array (cells x PCs)
-    X_pca = X_pca.to_numpy(dtype=np.float32, copy=False)
-    print(X_pca.shape)  # (n_cells, n_pcs)
+
+    metadata = metadata.set_index("cell_id_unique").loc[pca_df.index]
 
     reducer = umap.UMAP(
         n_neighbors=30,
@@ -118,18 +114,25 @@ def run_umap():
         metric="cosine",
         n_components=2,
         random_state=0,
+        low_memory=True,
     )
 
     X_umap = reducer.fit_transform(X_pca)
 
-    meta = pd.read_csv("D:\\thesis-research\\resources\\metadata.csv", index_col=0)  # adjust if needed
-    counts = meta["nCount_RNA"].to_numpy()
+    adata = AnnData(X=X_pca)
+    adata.obs = metadata.copy()
+    adata.obsm["X_umap"] = X_umap
 
-    plt.figure()
-    plt.scatter(X_umap[:, 0], X_umap[:, 1], s=1, c=np.log2(np.clip(counts, 10, 5000)), alpha=0.05)
-    plt.axis("equal")
-    plt.axis("off")
-    plt.show()
+    sc.pp.neighbors(
+        adata,
+        n_neighbors=30,
+        use_rep="X",
+        metric="cosine"
+    )
+
+    sc.tl.leiden(adata, resolution=1.2, key_added="cluster", random_state=0)
+
+    return adata
 
 # first run clustering on the method of atmox
 # compare my clusters to their clusters
@@ -310,6 +313,6 @@ def plot_spatial_clusters(
     plt.show()
 
 # copy_slice_info(None)
-run_clustering()
+# run_clustering()
 # adata = anndata.read_h5ad('D:/thesis-research/resources/clustered_adata.h5ad')
 # run_clustering(adata)
