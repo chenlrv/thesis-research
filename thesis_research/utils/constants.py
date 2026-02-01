@@ -10,3 +10,4 @@ FOV_POSITIONS_FILE_PATH = "{resources}/{sample_id}/{sample_id}_fov_positions_fil
 EXPRESSION_MATRIX_FILE_PATH = "{resources}/{sample_id}/{sample_id}_exprMat_file.csv"
 ADATA_FILE_PATH = "{resources}/{sample_id}/{sample_id}_adata.h5ad"
 FOV_SLICES_FILE_PATH = "{resources}/{sample_id}/{sample_id}_fov_slices.csv"
+SLICE_TYPES_FILE_PATH = "{resources}/{sample_id}/{sample_id}_slice_types.csv"
