@@ -14,6 +14,8 @@ import pyreadr
 import umap
 import matplotlib.colors as mcolors
 
+from thesis_research.utils.columns import CELL_ID_UNIQUE
+
 
 def copy_slice_info(source_adata: AnnData):
     source_adata = anndata.read_h5ad("D:/thesis-research/resources/adata_full.h5ad")
@@ -76,11 +78,11 @@ def copy_slice_info(source_adata: AnnData):
 
 
 def extract_features_for_pca(adata: AnnData):
-    copy_slice_info(adata)
+    # copy_slice_info(adata)
     probes = get_negative_system_probes(adata)
     adata = remove_negative_system_probes(adata, probes)
 
-    adata.obs_names = adata.obs["cell_id_unique"].astype(str)
+    adata.obs_names = adata.obs[CELL_ID_UNIQUE].astype(str)
     assert adata.obs_names.is_unique
     X = adata.layers["counts"] if "counts" in adata.layers else adata.X
 
