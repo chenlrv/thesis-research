@@ -8,12 +8,15 @@ from anndata import AnnData
 
 from thesis_research.qc_pipeline.analysis import extract_features_for_pca
 from thesis_research.qc_pipeline.cell_qc_plots import run_cell_qc
-from thesis_research.qc_pipeline.position_plots import generate_position_plots, plot_counts_over_space
+from thesis_research.qc_pipeline.position_plots import (
+    generate_position_plots,
+    plot_counts_over_space,
+)
 
 from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
 
 from thesis_research.qc_pipeline.utils import get_slice_adata, load_slices_from_csv
-from thesis_research.utils.columns import SAMPLE_ID
+from thesis_research.utils.columns import SAMPLE_ID, CELL_ID_UNIQUE, CELL_ID
 from thesis_research.utils.constants import COSMX_RAW_DATA_DIR
 
 from thesis_research.utils.entity_type import EntityType, get_path
@@ -24,9 +27,11 @@ LOGGER = logging.getLogger(__name__)
 def run_pipeline(fov_qc: bool = False, position_plots: bool = True) -> None:
     run_id = str(uuid.uuid4())
 
-    print(f"Starting QC pipeline run = {run_id}...")
+    print(f"🕒 Starting QC pipeline run = {run_id}...")
     adatas = []
-    for sample_dir in sorted(p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir() and str(p.name).startswith("L")):
+    for sample_dir in sorted(
+        p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir() and str(p.name).startswith("L")
+    ):
         sample_id = sample_dir.name
         print(f"Processing sample {sample_id}...")
 
@@ -47,13 +52,11 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = True) -> None:
             slice_adata = run_cell_qc(slice_adata, sample_id, sample_slice, run_id)
             slice_adatas.append(slice_adata)
 
-        adatas.append(anndata.concat(slice_adatas))
+        adatas.append(_merge_slice_adatas(slice_adatas, sample_id))
         print(f"✅ Successfully done QC for sample {sample_id}!")
 
-    analysis_adata = anndata.concat(adatas)
+    analysis_adata = _merge_sample_adatas(adatas)
     extract_features_for_pca(analysis_adata)
-
-
 
 
 def _get_adata(sample_id: str) -> AnnData:
@@ -80,8 +83,8 @@ def _get_adata(sample_id: str) -> AnnData:
 
 
 def _add_unique_id_per_cell(adata: AnnData, sample_id: str) -> AnnData:
-    if "cell_id_unique" not in adata.obs.columns:
-        adata.obs["cell_id_unique"] = adata.obs['cell_id'].astype(str) + "_" + sample_id
+    if CELL_ID_UNIQUE not in adata.obs.columns:
+        adata.obs[CELL_ID_UNIQUE] = adata.obs[CELL_ID].astype(str) + "_" + sample_id
     return adata
 
 
@@ -93,9 +96,24 @@ def _load_adata(sample_id: str) -> AnnData:
         meta_file=f"{sample_id}_metadata_file.csv",
         fov_file=f"{sample_id}_fov_positions_file.csv",
     )
-    adata.obs[SAMPLE_ID] = sample_id
+    adata.uns[SAMPLE_ID] = sample_id
 
     return adata
+
+
+def _merge_slice_adatas(slice_adatas: list[AnnData], sample_id: str) -> AnnData:
+    adata = ad.concat(slice_adatas)
+    adata.uns[SAMPLE_ID] = sample_id
+    return adata
+
+
+def _merge_sample_adatas(adatas: list[AnnData]) -> AnnData:
+    return ad.concat(
+        adatas,
+        keys=[a.uns[SAMPLE_ID] for a in adatas],
+        label=SAMPLE_ID,
+        index_unique="-",  # makes obs_names like "L321-1_1"
+    )
 
 
 run_pipeline()

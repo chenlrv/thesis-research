@@ -5,7 +5,10 @@ import numpy as np
 from anndata import AnnData
 from matplotlib import pyplot as plt
 
-from thesis_research.qc_pipeline.filters import get_negative_system_probes, remove_negative_system_probes
+from thesis_research.qc_pipeline.filters import (
+    get_negative_system_probes,
+    remove_negative_system_probes,
+)
 from scipy.io import mmwrite
 import pyreadr
 import umap
@@ -13,14 +16,28 @@ import matplotlib.colors as mcolors
 
 
 def copy_slice_info(source_adata: AnnData):
-    source_adata = anndata.read_h5ad('D:/thesis-research/resources/adata_full.h5ad')
-    target_adata = anndata.read_h5ad('D:/thesis-research/resources/adata_slim.h5ad') #todo load adata_new here and copy slice info from source_adata, so it will hold everything
+    source_adata = anndata.read_h5ad("D:/thesis-research/resources/adata_full.h5ad")
+    target_adata = anndata.read_h5ad(
+        "D:/thesis-research/resources/adata_slim.h5ad"
+    )  # todo load adata_new here and copy slice info from source_adata, so it will hold everything
 
-    if "cell_id_unique" not in source_adata.obs.columns or "cell_id_unique" not in target_adata.obs.columns:
+    if (
+        "cell_id_unique" not in source_adata.obs.columns
+        or "cell_id_unique" not in target_adata.obs.columns
+    ):
         raise KeyError("Both source and target AnnData must have 'cell_id_unique' in .obs")
 
     # Create a DataFrame for mapping
-    mapping_df = source_adata.obs[["cell_id_unique", "CenterX_global_px", "CenterY_global_px", "sample_ID", "slice_type", "slice_ID"]]
+    mapping_df = source_adata.obs[
+        [
+            "cell_id_unique",
+            "CenterX_global_px",
+            "CenterY_global_px",
+            "sample_ID",
+            "slice_type",
+            "slice_ID",
+        ]
+    ]
 
     target_adata.obs["CenterX_global_px"] = target_adata.obs["cell_id_unique"].map(
         mapping_df.set_index("cell_id_unique")["CenterX_global_px"]
@@ -40,8 +57,9 @@ def copy_slice_info(source_adata: AnnData):
         mapping_df.set_index("cell_id_unique")["slice_type"]
     )
 
-
-    target_adata.write_h5ad('D:/thesis-research/resources/adata_with_slices.h5ad', compression='gzip')
+    target_adata.write_h5ad(
+        "D:/thesis-research/resources/adata_with_slices.h5ad", compression="gzip"
+    )
 
     target_adata.obs["slice_ID"] = target_adata.obs["slice_ID"].astype("category")
     sc.pl.umap(
@@ -54,8 +72,7 @@ def copy_slice_info(source_adata: AnnData):
         color="slice_type",  # "tumor" / "healthy"
     )
 
-    print('done')
-
+    print("done")
 
 
 def extract_features_for_pca(adata: AnnData):
@@ -73,7 +90,6 @@ def extract_features_for_pca(adata: AnnData):
     adata.obs.to_csv("metadata.csv")
 
 
-
 def run_pca(adata: AnnData):
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -82,29 +98,21 @@ def run_pca(adata: AnnData):
 
     sc.tl.pca(adata, n_comps=50, random_state=42)
 
-    sc.pp.neighbors(adata, n_pcs=30, metric='cosine', random_state=42)
+    sc.pp.neighbors(adata, n_pcs=30, metric="cosine", random_state=42)
     sc.tl.umap(adata, random_state=42)
     sc.tl.leiden(adata, resolution=0.45, key_added="cluster", random_state=42)
 
     sc.pl.umap(adata, color="sample_id", legend_loc="right margin")
 
-    sc.pl.umap(
-        adata,
-        color="cluster",
-        legend_loc="right margin",
-        title="Clusters"
-    )
+    sc.pl.umap(adata, color="cluster", legend_loc="right margin", title="Clusters")
 
 
 def run_umap(metadata: pd.DataFrame) -> AnnData:
-    print('Starting umap')
-    pca_df =  pd.read_csv(
-        "D:/thesis-research/resources/X_pca_pearson_batch.csv", index_col=0
-    )
+    print("Starting umap")
+    pca_df = pd.read_csv("D:/thesis-research/resources/X_pca_pearson_batch.csv", index_col=0)
     X_pca = pca_df.to_numpy(dtype=np.float32)
     cell_ids = pca_df.index.to_numpy()
     print(X_pca.shape, cell_ids[:3])
-
 
     metadata = metadata.set_index("cell_id_unique").loc[pca_df.index]
 
@@ -123,16 +131,12 @@ def run_umap(metadata: pd.DataFrame) -> AnnData:
     adata.obs = metadata.copy()
     adata.obsm["X_umap"] = X_umap
 
-    sc.pp.neighbors(
-        adata,
-        n_neighbors=30,
-        use_rep="X",
-        metric="cosine"
-    )
+    sc.pp.neighbors(adata, n_neighbors=30, use_rep="X", metric="cosine")
 
     sc.tl.leiden(adata, resolution=1.2, key_added="cluster", random_state=0)
 
     return adata
+
 
 # first run clustering on the method of atmox
 # compare my clusters to their clusters
@@ -141,6 +145,7 @@ def run_umap(metadata: pd.DataFrame) -> AnnData:
 # check the differences
 # check if they have cell type annotation
 # show the annotated cells on the spatial location
+
 
 def distinct_palette_hex(n: int) -> list[str]:
     hues = np.linspace(0, 1, n, endpoint=False).tolist()
@@ -173,12 +178,12 @@ def run_clustering():
         21: "Microglia_APC",
         22: "Barrier_Epithelial",
         23: "ChoroidPlexus",
-        24: "Microglia_ISG"
+        24: "Microglia_ISG",
     }
 
     celltype_order = [cluster_labels[i] for i in range(25)]
 
-    adata = anndata.read_h5ad('D:/thesis-research/resources/adata_with_slices.h5ad')
+    adata = anndata.read_h5ad("D:/thesis-research/resources/adata_with_slices.h5ad")
     cluster_key = "cluster"  # or "leiden"
     cats = [str(i) for i in range(25)]
     adata.obs[cluster_key] = adata.obs[cluster_key].astype(str)
@@ -186,16 +191,17 @@ def run_clustering():
 
     adata.uns[f"{cluster_key}_colors"] = distinct_palette_hex(25)
 
-
-    adata.obs["cell_type"] = adata.obs["cluster"].map({str(k): v for k, v in cluster_labels.items()})
+    adata.obs["cell_type"] = adata.obs["cluster"].map(
+        {str(k): v for k, v in cluster_labels.items()}
+    )
     adata.obs["cell_type"] = adata.obs["cell_type"].astype("category")
-
 
     print("Cluster counts:\n", adata.obs[cluster_key].value_counts().sort_index())
     print("Cell type counts:\n", adata.obs["cell_type"].value_counts(dropna=False))
 
     try:
         from colorcet import glasbey  # pip install colorcet
+
         palette = list(glasbey[:25])
         print("Using colorcet.glasbey palette")
     except Exception:
@@ -207,12 +213,12 @@ def run_clustering():
     umap_point_size = 10
     legend_dot_size = 14
 
-    fig, ax = plt.subplots(1, 1, figsize=(20, 12),dpi=300)
+    fig, ax = plt.subplots(1, 1, figsize=(20, 12), dpi=300)
 
     sc.pl.umap(
         adata,
         color="cell_type",
-        legend_loc=None,   # no scanpy legend
+        legend_loc=None,  # no scanpy legend
         frameon=False,
         size=umap_point_size,
         ax=ax,
@@ -221,9 +227,15 @@ def run_clustering():
 
     # custom legend outside axes, with big dots
     handles = [
-        plt.Line2D([0], [0], marker="o", linestyle="",
-                   markersize=legend_dot_size,
-                   markerfacecolor=palette[i], markeredgecolor="none")
+        plt.Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="",
+            markersize=legend_dot_size,
+            markerfacecolor=palette[i],
+            markeredgecolor="none",
+        )
         for i in range(25)
     ]
 
@@ -246,13 +258,9 @@ def run_clustering():
     plt.show()
     print("Saved:", out)
 
-    for sample_id in adata.obs['sample_ID'].cat.categories:
-        adata_sample = adata[adata.obs['sample_ID'] == sample_id].copy()
-        plot_spatial_clusters(
-            adata_sample,
-            f'Spatial Cell Type Plot - Sample {sample_id}'
-        )
-
+    for sample_id in adata.obs["sample_ID"].cat.categories:
+        adata_sample = adata[adata.obs["sample_ID"] == sample_id].copy()
+        plot_spatial_clusters(adata_sample, f"Spatial Cell Type Plot - Sample {sample_id}")
 
     # sc.pl.umap(
     #     adata,
@@ -262,18 +270,19 @@ def run_clustering():
     # )
     # sc.pl.umap(adata, color=["cluster", "cell_type"], wspace=0.4, frameon=False)
 
+
 def plot_spatial_clusters(
-        adata,
-        plot_title: str,
-        color_col="cell_type",
-        x_key="CenterX_global_px",
-        y_key="CenterY_global_px",
-        s=0.5,
-        alpha=1.0,
-        dpi=500,
-        figsize=(12, 12),
-        invert_y=True,
-        savepath=None
+    adata,
+    plot_title: str,
+    color_col="cell_type",
+    x_key="CenterX_global_px",
+    y_key="CenterY_global_px",
+    s=0.5,
+    alpha=1.0,
+    dpi=500,
+    figsize=(12, 12),
+    invert_y=True,
+    savepath=None,
 ):
     adata.obs[color_col] = adata.obs[color_col].astype("category")
     cats = list(adata.obs[color_col].cat.categories)
@@ -311,6 +320,7 @@ def plot_spatial_clusters(
         plt.savefig(savepath, dpi=dpi, bbox_inches="tight")
         print("Saved:", savepath)
     plt.show()
+
 
 # copy_slice_info(None)
 # run_clustering()

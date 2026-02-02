@@ -28,7 +28,7 @@ def run_cell_qc(adata: AnnData, sample_id: str, sample_slice: SampleSlice, run_i
     # plot_counts_over_space(adata)
     adata.obs[LOW_RNA_COUNT] = flag
 
-    xy = adata.obsm['spatial_fov']
+    xy = adata.obsm["spatial_fov"]
     # plot_flagged_cells(xy, adata.obs[LOW_RNA_COUNT].to_numpy())
     return adata[~adata.obs[LOW_RNA_COUNT]].copy()
 

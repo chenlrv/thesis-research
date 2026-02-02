@@ -22,7 +22,7 @@ from thesis_research.utils.entity_type import EntityType, get_path, get_output_d
 
 def generate_position_plots(adata: AnnData, slices: list[SampleSlice], run_id: str) -> None:
     print("Generating position plots...")
-    sample_id = adata.obs[SAMPLE_ID].iat[0]
+    sample_id = adata.uns[SAMPLE_ID]
     output_dir = get_output_dir(sample_id, run_id)
 
     plot_fov_positions(sample_id, output_dir)
@@ -112,9 +112,16 @@ def plot_fov_positions_sliced(
         ax.text(xi, yi, str(label), ha="center", va="center", fontsize=3, color="black")
 
     handles = [
-        Line2D([0], [0], marker="s", linestyle="",
-               markerfacecolor=slice_to_color[sid], markeredgecolor="none",
-               markersize=10, label=sid)
+        Line2D(
+            [0],
+            [0],
+            marker="s",
+            linestyle="",
+            markerfacecolor=slice_to_color[sid],
+            markeredgecolor="none",
+            markersize=10,
+            label=sid,
+        )
         for sid in np.unique(slice_index)
     ]
     ax.legend(handles=handles, title="Slice ID", loc="upper right", frameon=True)
@@ -133,7 +140,7 @@ def plot_fov_positions_sliced(
 
 def plot_cells_positions_with_area(adata: AnnData, output_dir: Path) -> None:
     """Generate a scatter plot of cells colored by their area."""
-    sample_id = adata.obs[SAMPLE_ID].iat[0]
+    sample_id = adata.uns[SAMPLE_ID]
 
     x = adata.obs[CENTER_X_GLOBAL_PX].to_numpy(float)
     y = adata.obs[CENTER_Y_GLOBAL_PX].to_numpy(float)
@@ -164,7 +171,7 @@ def plot_counts_over_space(
     vmin=10,
     vmax=5000,
     legendvals=(10, 100, 1000, 5000),
-    s=1,                 # dot size (matplotlib "s" is area in points^2)
+    s=1,  # dot size (matplotlib "s" is area in points^2)
     cmap="inferno",
 ):
     """
@@ -206,7 +213,9 @@ def plot_counts_over_space(
 
     handles = [plt.Line2D([], [], linestyle="", marker="o", markersize=0, color="none")]
     labels = ["Total counts:"]
-    handles += [plt.Line2D([], [], linestyle="", marker="o", markersize=6, color=col) for col in lv_colors]
+    handles += [
+        plt.Line2D([], [], linestyle="", marker="o", markersize=6, color=col) for col in lv_colors
+    ]
     labels += [str(int(v)) for v in legendvals]
 
     ax.legend(handles, labels, loc="lower right", frameon=True)
@@ -227,11 +236,14 @@ def plot_flagged_cells(xy, flag, s=1):
     colors = np.where(flag, "red", "lightgrey")
 
     fig, ax = plt.subplots()
-    ax.scatter(xy[:, 1], xy[:, 0],  # reverse columns like xy[, 2:1]
-               s=s,
-               c=colors,
-               marker="o",
-               linewidths=0)
+    ax.scatter(
+        xy[:, 1],
+        xy[:, 0],  # reverse columns like xy[, 2:1]
+        s=s,
+        c=colors,
+        marker="o",
+        linewidths=0,
+    )
 
     ax.set_aspect("equal")
     ax.set_xticks([])
@@ -241,13 +253,14 @@ def plot_flagged_cells(xy, flag, s=1):
 
     plt.show()
 
+
 def _add_slice_column(fov_df: pd.DataFrame, slices: list[SampleSlice]) -> pd.DataFrame:
     """Add a 'slice' column to the FOV DataFrame based on the provided slices."""
     fov_df = fov_df.copy()
     slice_mapping = {}
     for i, sample_slice in enumerate(slices):
         for fov in sample_slice.fov_ids:
-            slice_mapping[fov] = i
+            slice_mapping[fov] = sample_slice.slice_id
 
     fov_df[SLICE_ID] = fov_df[FOV].map(slice_mapping)
     return fov_df

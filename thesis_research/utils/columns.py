@@ -5,8 +5,10 @@ X_GLOBAL_PX = "x_global_px"
 Y_GLOBAL_PX = "y_global_px"
 SLICE_ID = "slice_ID"
 
+
 class AdataObs:
     FOV = FOV
+    CELL_ID = "cell_id"
     SLIDE_ID = "slide_ID"
     N_COUNT_RNA = "nCount_RNA"
     N_FEATURE_RNA = "nFeature_RNA"
@@ -22,8 +24,10 @@ class AdataObs:
     SAMPLE_ID = "sample_ID"
     SLICE_ID = SLICE_ID
     SLICE_TYPE = "slice_type"
+    CELL_ID_UNIQUE = "cell_id_unique"
 
 
+CELL_ID = AdataObs.CELL_ID
 SLIDE_ID = AdataObs.SLIDE_ID
 N_COUNT_RNA = AdataObs.N_COUNT_RNA
 N_FEATURE_RNA = AdataObs.N_FEATURE_RNA
@@ -36,6 +40,8 @@ AREA = AdataObs.AREA
 LOW_RNA_COUNT = AdataObs.LOW_RNA_COUNT
 SAMPLE_ID = AdataObs.SAMPLE_ID
 SLICE_TYPE = AdataObs.SLICE_TYPE
+CELL_ID_UNIQUE = AdataObs.CELL_ID_UNIQUE
+
 
 class FovSlicesCol:
     SLICE = "slice"
