@@ -5,7 +5,6 @@ import pandas as pd
 from anndata import AnnData
 
 
-
 def get_negative_system_probes(adata: AnnData) -> AnnData:
     """Extract negative and system control probes from the dataset."""
 
@@ -18,9 +17,7 @@ def get_negative_system_probes(adata: AnnData) -> AnnData:
 
     probes = adata[:, combined_mask].copy()
 
-    print(
-        f"Found {probes.n_vars} negative/system-control probes: {list(probes.var_names)}"
-    )
+    print(f"Found {probes.n_vars} negative/system-control probes: {list(probes.var_names)}")
 
     return probes
 
@@ -32,10 +29,7 @@ def remove_negative_system_probes(adata: AnnData, probes: AnnData) -> AnnData:
     if probes.n_vars > 0:
         probe_names = probes.var_names
         adata = adata[:, ~adata.var_names.isin(probe_names)].copy()
-        print(
-            f"Removed {len(probe_names)} probes.\n"
-            f" Final var count: {adata.n_vars}"
-        )
+        print(f"Removed {len(probe_names)} probes.\n" f" Final var count: {adata.n_vars}")
 
     return adata
 

@@ -23,7 +23,7 @@ def run_exploration(adata: AnnData, sample_id: str, sample_slice: str, run_id: s
     adata.obs[PERCENT_NEGPRB] = x * 100 if x.max() <= 1.0 else x
     features = [N_FEATURE_RNA, N_COUNT_RNA, PERCENT_NEGPRB, AREA]
 
-    output_dir = get_output_dir(sample_id, run_id)
+    output_dir = get_output_dir(run_id, sample_id)
     for feature in features:
         _generate_histogram(adata, sample_id, sample_slice, feature, output_dir)
         _generate_violin_plot(adata, sample_id, feature, output_dir)

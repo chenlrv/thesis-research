@@ -12,11 +12,11 @@ from thesis_research.utils.entity_type import get_output_dir
 
 
 def run_cell_qc(adata: AnnData, sample_id: str, sample_slice: SampleSlice, run_id: str) -> AnnData:
-    print("Generating cell QC plots...")
+    print("🕒 Generating cell QC plots...")
     adata_counts = adata.obs[N_COUNT_RNA]
     threshold, flag = _low_count_flag(adata_counts)
     _generate_log2_count_cutoff_histogram(
-        sample_id, sample_slice, adata_counts, threshold, flag, get_output_dir(sample_id, run_id)
+        sample_id, sample_slice, adata_counts, threshold, flag, get_output_dir(run_id, sample_id)
     )
 
     num_cells_to_remove = flag.sum()

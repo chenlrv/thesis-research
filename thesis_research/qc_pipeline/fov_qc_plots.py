@@ -9,7 +9,7 @@ from thesis_research.utils.entity_type import get_output_dir
 
 def run_fov_qc(adata: AnnData, run_id: str) -> AnnData:
     sample_id = adata.uns[SAMPLE_ID]
-    output_dir = get_output_dir(sample_id, run_id)
+    output_dir = get_output_dir(run_id, sample_id)
 
     barcodemap = pd.read_csv("/resources/barcodemap_Mm_UCC.csv")
     barcodemap["gene"] = barcodemap["gene"].astype(str)

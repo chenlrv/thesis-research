@@ -17,13 +17,17 @@ from thesis_research.utils.columns import (
     CENTER_X_GLOBAL_PX,
     SLICE_ID,
 )
-from thesis_research.utils.entity_type import EntityType, get_path, get_output_dir
+from thesis_research.utils.entity_type import (
+    SampleEntityType,
+    get_sample_resource_path,
+    get_output_dir,
+)
 
 
 def generate_position_plots(adata: AnnData, slices: list[SampleSlice], run_id: str) -> None:
-    print("Generating position plots...")
+    print("🕒 Generating position plots...")
     sample_id = adata.uns[SAMPLE_ID]
-    output_dir = get_output_dir(sample_id, run_id)
+    output_dir = get_output_dir(run_id, sample_id)
 
     plot_fov_positions(sample_id, output_dir)
     plot_fov_positions_sliced(sample_id, slices, output_dir)
@@ -37,7 +41,7 @@ def plot_fov_positions(
     faulty_color="#d95f5f",
 ) -> None:
     """Generate a plot showing the FOVs based on their global positions."""
-    fov_df = pd.read_csv(get_path(EntityType.FOV_POSITIONS_FILE, sample_id))
+    fov_df = pd.read_csv(get_sample_resource_path(SampleEntityType.FOV_POSITIONS_FILE, sample_id))
 
     fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
     fov_df = fov_df[fov_df[FOV].notna()]
@@ -85,7 +89,7 @@ def plot_fov_positions_sliced(
     output_dir: Path,
 ) -> None:
     """Generate a plot showing the FOVs slices based on their global positions."""
-    fov_df = pd.read_csv(get_path(EntityType.FOV_POSITIONS_FILE, sample_id))
+    fov_df = pd.read_csv(get_sample_resource_path(SampleEntityType.FOV_POSITIONS_FILE, sample_id))
     fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
     fov_df = fov_df[fov_df[FOV].notna()]
     fov_df = _add_slice_column(fov_df, slices)

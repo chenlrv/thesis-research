@@ -5,16 +5,15 @@ import numpy as np
 from anndata import AnnData
 from matplotlib import pyplot as plt
 
-from thesis_research.qc_pipeline.filters import (
-    get_negative_system_probes,
-    remove_negative_system_probes,
-)
-from scipy.io import mmwrite
-import pyreadr
 import umap
 import matplotlib.colors as mcolors
 
 from thesis_research.utils.columns import CELL_ID_UNIQUE
+from thesis_research.utils.entity_type import (
+    GlobalEntityType,
+    get_global_resource_path,
+    get_output_dir,
+)
 
 
 def copy_slice_info(source_adata: AnnData):
@@ -77,21 +76,6 @@ def copy_slice_info(source_adata: AnnData):
     print("done")
 
 
-def extract_features_for_pca(adata: AnnData):
-    # copy_slice_info(adata)
-    probes = get_negative_system_probes(adata)
-    adata = remove_negative_system_probes(adata, probes)
-
-    adata.obs_names = adata.obs[CELL_ID_UNIQUE].astype(str)
-    assert adata.obs_names.is_unique
-    X = adata.layers["counts"] if "counts" in adata.layers else adata.X
-
-    mmwrite("counts.mtx", X)
-    adata.var_names.to_series().to_csv("genes.txt", index=False, header=False)
-    adata.obs_names.to_series().to_csv("cells.txt", index=False, header=False)
-    adata.obs.to_csv("metadata.csv")
-
-
 def run_pca(adata: AnnData):
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -109,14 +93,16 @@ def run_pca(adata: AnnData):
     sc.pl.umap(adata, color="cluster", legend_loc="right margin", title="Clusters")
 
 
-def run_umap(metadata: pd.DataFrame) -> AnnData:
-    print("Starting umap")
-    pca_df = pd.read_csv("D:/thesis-research/resources/X_pca_pearson_batch.csv", index_col=0)
-    X_pca = pca_df.to_numpy(dtype=np.float32)
-    cell_ids = pca_df.index.to_numpy()
-    print(X_pca.shape, cell_ids[:3])
+def run_umap(run_id: str) -> AnnData:
+    print(f"🕒 Starting UMAP...")
 
-    metadata = metadata.set_index("cell_id_unique").loc[pca_df.index]
+    pca_df = pd.read_csv(
+        get_global_resource_path(GlobalEntityType.X_PCA_PEARSON_BATCH_FILE), index_col=0
+    )
+    X_pca = pca_df.to_numpy(dtype=np.float32)
+
+    metadata = pd.read_csv(get_global_resource_path(GlobalEntityType.METADATA_FILE), index_col=0)
+    metadata = metadata.set_index(CELL_ID_UNIQUE).loc[pca_df.index]
 
     reducer = umap.UMAP(
         n_neighbors=30,
@@ -137,16 +123,17 @@ def run_umap(metadata: pd.DataFrame) -> AnnData:
 
     sc.tl.leiden(adata, resolution=1.2, key_added="cluster", random_state=0)
 
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
+
+    sc.pl.umap(
+        adata, color="cluster", legend_loc="right margin", title="Clusters", ax=ax, show=False
+    )
+
+    fig.tight_layout()
+    fig.savefig(get_output_dir(run_id) / "umap_clusters.png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
     return adata
-
-
-# first run clustering on the method of atmox
-# compare my clusters to their clusters
-
-# run pca, clustrting on every sample individually
-# check the differences
-# check if they have cell type annotation
-# show the annotated cells on the spatial location
 
 
 def distinct_palette_hex(n: int) -> list[str]:
@@ -323,6 +310,14 @@ def plot_spatial_clusters(
         print("Saved:", savepath)
     plt.show()
 
+
+# first run clustering on the method of atmox
+# compare my clusters to their clusters
+
+# run pca, clustrting on every sample individually
+# check the differences
+# check if they have cell type annotation
+# show the annotated cells on the spatial location
 
 # copy_slice_info(None)
 # run_clustering()

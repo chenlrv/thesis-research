@@ -1,0 +1,8 @@
+1. Run run_batch_aware_pca.R to perform PCA on batch-corrected data
+2. Run run_umap which uses the X_pca_pearson.csv output from step 1, and adds "cluster" column to obs
+3. After step 2, we have adata with "cluster" column in obs
+4. Run extract_cluster_labels to get the prompt to send to chatgpt
+5. Use chatgpt / gemini in research mode to get cluster labels
+6.
+
+

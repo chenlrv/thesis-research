@@ -1,17 +1,13 @@
 import logging
 import uuid
 
-import anndata
 import anndata as ad
 import squidpy as sq
 from anndata import AnnData
 
-from thesis_research.qc_pipeline.analysis import extract_features_for_pca
+from thesis_research.qc_pipeline.analysis import run_umap
 from thesis_research.qc_pipeline.cell_qc_plots import run_cell_qc
-from thesis_research.qc_pipeline.position_plots import (
-    generate_position_plots,
-    plot_counts_over_space,
-)
+from thesis_research.qc_pipeline.position_plots import generate_position_plots
 
 from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
 
@@ -19,7 +15,7 @@ from thesis_research.qc_pipeline.utils import get_slice_adata, load_slices_from_
 from thesis_research.utils.columns import SAMPLE_ID, CELL_ID_UNIQUE, CELL_ID
 from thesis_research.utils.constants import COSMX_RAW_DATA_DIR
 
-from thesis_research.utils.entity_type import EntityType, get_path
+from thesis_research.utils.entity_type import SampleEntityType, get_sample_resource_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,13 +23,13 @@ LOGGER = logging.getLogger(__name__)
 def run_pipeline(fov_qc: bool = False, position_plots: bool = True) -> None:
     run_id = str(uuid.uuid4())
 
-    print(f"🕒 Starting QC pipeline run = {run_id}...")
+    print(f"🧬 Starting QC pipeline run = {run_id}...")
     adatas = []
     for sample_dir in sorted(
         p for p in COSMX_RAW_DATA_DIR.iterdir() if p.is_dir() and str(p.name).startswith("L")
     ):
         sample_id = sample_dir.name
-        print(f"Processing sample {sample_id}...")
+        print(f"🕒 Processing sample {sample_id}...")
 
         adata = _get_adata(sample_id)
         adata = _add_unique_id_per_cell(adata, sample_id)
@@ -56,12 +52,13 @@ def run_pipeline(fov_qc: bool = False, position_plots: bool = True) -> None:
         print(f"✅ Successfully done QC for sample {sample_id}!")
 
     analysis_adata = _merge_sample_adatas(adatas)
-    extract_features_for_pca(analysis_adata)
+    run_umap(run_id)
+    print("☑️ Successfully merged all sample adatas! ☑️")
 
 
 def _get_adata(sample_id: str) -> AnnData:
-    print(f"Getting adata for sample {sample_id}...")
-    adata_file_path = get_path(EntityType.ADATA_FILE, sample_id)
+    print(f"🕒 Getting adata for sample {sample_id}...")
+    adata_file_path = get_sample_resource_path(SampleEntityType.ADATA_FILE, sample_id)
 
     if adata_file_path.exists():
         print("Loading cached adata...")
@@ -89,7 +86,7 @@ def _add_unique_id_per_cell(adata: AnnData, sample_id: str) -> AnnData:
 
 
 def _load_adata(sample_id: str) -> AnnData:
-    sample_dir = get_path(EntityType.SAMPLE_DIR, sample_id)
+    sample_dir = get_sample_resource_path(SampleEntityType.SAMPLE_DIR, sample_id)
     adata = sq.read.nanostring(
         path=sample_dir,
         counts_file=f"{sample_id}_exprMat_file.csv",
