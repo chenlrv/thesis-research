@@ -5,18 +5,18 @@ from anndata import AnnData
 import matplotlib.pyplot as plt
 import numpy as np
 
-from thesis_research.qc_pipeline.position_plots import plot_counts_over_space, plot_flagged_cells
-from thesis_research.qc_pipeline.sample_slice import SampleSlice
-from thesis_research.utils.columns import N_COUNT_RNA, LOW_RNA_COUNT
+from thesis_research.utils.columns import N_COUNT_RNA, LOW_RNA_COUNT, SAMPLE_ID, SLICE_ID
 from thesis_research.utils.entity_type import get_output_dir
 
 
-def run_cell_qc(adata: AnnData, sample_id: str, sample_slice: SampleSlice, run_id: str) -> AnnData:
+def run_cell_qc(adata: AnnData, run_id: str) -> AnnData:
     print("🕒 Generating cell QC plots...")
+    sample_id = adata.uns[SAMPLE_ID]
+    slice_id = adata.uns[SLICE_ID]
     adata_counts = adata.obs[N_COUNT_RNA]
     threshold, flag = _low_count_flag(adata_counts)
     _generate_log2_count_cutoff_histogram(
-        sample_id, sample_slice, adata_counts, threshold, flag, get_output_dir(run_id, sample_id)
+        sample_id, slice_id, adata_counts, threshold, flag, get_output_dir(run_id, sample_id)
     )
 
     num_cells_to_remove = flag.sum()
@@ -47,7 +47,7 @@ def _low_count_flag(
 
 def _generate_log2_count_cutoff_histogram(
     sample_id: str,
-    sample_slice: SampleSlice,
+    slice_id: str,
     adata_counts: pd.Series,
     threshold: float,
     flag: np.ndarray,
@@ -76,10 +76,10 @@ def _generate_log2_count_cutoff_histogram(
     plt.axvline(np.log2(threshold), color="red")
     plt.xlabel("Log2 counts per cell")
     plt.ylabel("N cells")
-    plt.title(f"{sample_id} slice {sample_slice.slice_id} Log2 counts per cell histogram")
+    plt.title(f"{sample_id} slice {slice_id} Log2 counts per cell histogram")
     plt.legend([f"{flag.mean() * 100:.1f}% rejected"], loc="upper left")
     plt.savefig(
-        output_dir / f"slice_{sample_slice.slice_id}_log2_count_histogram.png",
+        output_dir / f"slice_{slice_id}_log2_count_histogram.png",
         dpi=300,
         bbox_inches="tight",
     )

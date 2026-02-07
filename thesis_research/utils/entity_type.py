@@ -9,6 +9,7 @@ from thesis_research.utils.constants import (
     FOV_SLICES_FILE_PATH,
     SAMPLE_DIR_PATH,
     OUTPUTS_DIR,
+    CACHE_DIR_PATH,
 )
 
 
@@ -23,6 +24,7 @@ class SampleEntityType(str, Enum):
 class GlobalEntityType(str, Enum):
     X_PCA_PEARSON_BATCH_FILE = "x_pca_pearson_batch"
     METADATA_FILE = "metadata"
+    CACHE_DIR = "cache_dir"
 
 
 def get_sample_resource_path(entity_type: SampleEntityType, sample_id: str) -> Path:
@@ -35,7 +37,7 @@ def get_sample_resource_path(entity_type: SampleEntityType, sample_id: str) -> P
 
     try:
         template = templates[entity_type]
-        return Path(template.format(resources=COSMX_RAW_DATA_DIR, sample_id=sample_id))
+        return Path(template.format(cosmx_resources=COSMX_RAW_DATA_DIR, sample_id=sample_id))
     except KeyError:
         raise ValueError(f"Unsupported type: {entity_type}")
 
@@ -44,6 +46,7 @@ def get_global_resource_path(entity_type: GlobalEntityType) -> Path:
     templates = {
         GlobalEntityType.X_PCA_PEARSON_BATCH_FILE: COSMX_RAW_DATA_DIR / "x_pca_pearson_batch.csv",
         GlobalEntityType.METADATA_FILE: COSMX_RAW_DATA_DIR / "metadata.csv",
+        GlobalEntityType.CACHE_DIR: CACHE_DIR_PATH,
     }
 
     try:

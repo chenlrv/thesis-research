@@ -1,5 +1,3 @@
-from enum import Enum
-
 FOV = "fov"
 X_GLOBAL_PX = "x_global_px"
 Y_GLOBAL_PX = "y_global_px"
@@ -20,6 +18,7 @@ class AdataObs:
     CENTER_X_GLOBAL_PX = "CenterX_global_px"
     CENTER_Y_GLOBAL_PX = "CenterY_global_px"
     AREA = "Area"
+    AREA_MICROMETERS = "Area.um2"
     LOW_RNA_COUNT = "low_count"
     SAMPLE_ID = "sample_ID"
     SLICE_ID = SLICE_ID
@@ -37,6 +36,7 @@ PERCENT_NEGPRB = AdataObs.PERCENT_NEGPRB
 CENTER_X_GLOBAL_PX = AdataObs.CENTER_X_GLOBAL_PX
 CENTER_Y_GLOBAL_PX = AdataObs.CENTER_Y_GLOBAL_PX
 AREA = AdataObs.AREA
+AREA_MICROMETERS = AdataObs.AREA_MICROMETERS
 LOW_RNA_COUNT = AdataObs.LOW_RNA_COUNT
 SAMPLE_ID = AdataObs.SAMPLE_ID
 SLICE_TYPE = AdataObs.SLICE_TYPE

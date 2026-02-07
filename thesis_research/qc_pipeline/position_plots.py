@@ -6,7 +6,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from thesis_research.qc_pipeline.sample_slice import SampleSlice
 from thesis_research.utils.columns import (
     X_GLOBAL_PX,
     Y_GLOBAL_PX,
@@ -16,6 +15,8 @@ from thesis_research.utils.columns import (
     CENTER_Y_GLOBAL_PX,
     CENTER_X_GLOBAL_PX,
     SLICE_ID,
+    AREA_MICROMETERS,
+    SLICE_TYPE,
 )
 from thesis_research.utils.entity_type import (
     SampleEntityType,
@@ -24,13 +25,20 @@ from thesis_research.utils.entity_type import (
 )
 
 
-def generate_position_plots(adata: AnnData, slices: list[SampleSlice], run_id: str) -> None:
+def generate_position_plots(adata: AnnData, run_id: str) -> None:
     print("🕒 Generating position plots...")
     sample_id = adata.uns[SAMPLE_ID]
     output_dir = get_output_dir(run_id, sample_id)
 
     plot_fov_positions(sample_id, output_dir)
-    plot_fov_positions_sliced(sample_id, slices, output_dir)
+
+    slice_to_color = _get_slice_to_color(list(adata.obs[SLICE_ID].cat.categories))
+
+    plot_fov_positions_all_slices(adata, sample_id, output_dir, slice_to_color)
+
+    for slice_id in adata.obs[SLICE_ID].cat.categories:
+        plot_fov_positions_for_slice(run_id, adata, sample_id, slice_id, slice_to_color)
+
     plot_cells_positions_with_area(adata, output_dir)
 
 
@@ -83,32 +91,56 @@ def plot_fov_positions(
     plt.close(fig)
 
 
-def plot_fov_positions_sliced(
+def plot_fov_positions_all_slices(
+    adata: AnnData,
     sample_id: str,
-    slices: list[SampleSlice],
     output_dir: Path,
+    slice_to_color: dict[int, tuple],
 ) -> None:
     """Generate a plot showing the FOVs slices based on their global positions."""
     fov_df = pd.read_csv(get_sample_resource_path(SampleEntityType.FOV_POSITIONS_FILE, sample_id))
     fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
     fov_df = fov_df[fov_df[FOV].notna()]
-    fov_df = _add_slice_column(fov_df, slices)
+
+    fov_to_slice = (
+        adata.obs[[FOV, SLICE_ID]]
+        .dropna()
+        .drop_duplicates(subset=[FOV])
+        .set_index(FOV)[SLICE_ID]
+        .to_dict()
+    )
+    fov_df = _add_slice_column(fov_df, fov_to_slice)
 
     fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
 
     x = fov_df[X_GLOBAL_PX].to_numpy(float)
     y = fov_df[Y_GLOBAL_PX].to_numpy(float)
     fov_labels = fov_df[FOV].to_numpy()
-    slice_index = fov_df[SLICE_ID].to_numpy(int)
+    slice_index = pd.to_numeric(fov_df[SLICE_ID], errors="coerce")
+    slice_ids = sorted(slice_index.dropna().unique().astype(int).tolist())
 
-    rng = np.random.default_rng()
-    slice_to_color = {si: rng.random(3) for si in np.unique(slice_index)}
+    tumor_slice_ids = (
+        adata.obs.loc[adata.obs[SLICE_TYPE] == "tumor", SLICE_ID].dropna().unique().tolist()
+    )
 
-    for i in np.unique(slice_index):
-        m = slice_index == i
+    for slice_id in slice_ids:
+        m = (slice_index == slice_id).to_numpy()
         if not np.any(m):
             continue
-        ax.scatter(x[m], y[m], s=100, marker="s", c=[slice_to_color[i]], edgecolors="none")
+        ax.scatter(x[m], y[m], s=100, marker="s", c=[slice_to_color[slice_id]], edgecolors="none")
+
+        if slice_id in tumor_slice_ids:
+            cx, cy = np.median(x[m]), np.median(y[m])
+            ax.scatter(
+                [cx],
+                [cy],
+                s=220,
+                marker="*",
+                c="black",
+                edgecolors="black",
+                linewidths=0.5,
+                zorder=5,
+            )
 
     for xi, yi, label in zip(x, y, fov_labels):
         if pd.isna(label):
@@ -121,12 +153,12 @@ def plot_fov_positions_sliced(
             [0],
             marker="s",
             linestyle="",
-            markerfacecolor=slice_to_color[sid],
+            markerfacecolor=slice_to_color[slice_id],
             markeredgecolor="none",
             markersize=10,
-            label=sid,
+            label=slice_id,
         )
-        for sid in np.unique(slice_index)
+        for slice_id in slice_ids
     ]
     ax.legend(handles=handles, title="Slice ID", loc="upper right", frameon=True)
 
@@ -139,6 +171,59 @@ def plot_fov_positions_sliced(
 
     plt.tight_layout()
     plt.savefig(output_dir / "fov_positions_sliced.png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_fov_positions_for_slice(
+    run_id: str, adata: AnnData, sample_id: str, slice_id: str, slice_to_color: dict[int, tuple]
+) -> None:
+    output_dir = get_output_dir(run_id, sample_id)
+
+    fov_df = pd.read_csv(get_sample_resource_path(SampleEntityType.FOV_POSITIONS_FILE, sample_id))
+    fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
+    fov_df = fov_df[fov_df[FOV].notna()]
+    adata = adata[adata.obs[SLICE_ID] == slice_id].copy()
+    fov_to_slice = (
+        adata.obs[[FOV, SLICE_ID]]
+        .dropna()
+        .drop_duplicates(subset=[FOV])
+        .set_index(FOV)[SLICE_ID]
+        .to_dict()
+    )
+    fov_df = _add_slice_column(fov_df, fov_to_slice)
+    fov_df = fov_df[fov_df[SLICE_ID] == slice_id]
+
+    x = fov_df[X_GLOBAL_PX].to_numpy(float)
+    y = fov_df[Y_GLOBAL_PX].to_numpy(float)
+    labels = fov_df[FOV].astype("Int64").to_numpy()
+
+    n_fovs = int(adata.obs[FOV].nunique())
+    n_cells_slice = adata.n_obs
+    area_sum = pd.to_numeric(adata.obs[AREA_MICROMETERS]).sum()
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=300, constrained_layout=False)
+    ax.scatter(x, y, s=120, marker="s", c=[slice_to_color[int(slice_id)]], edgecolors="none")
+    for xi, yi, lab in zip(x, y, labels):
+        if pd.notna(lab):
+            ax.text(xi, yi, str(int(lab)), ha="center", va="center", fontsize=2, color="black")
+
+    area_txt = f"{area_sum:,.0f}"
+    ax.set_title(
+        f"Slice {slice_id} | FOVs {n_fovs} | Cells {n_cells_slice:,} | Area {area_txt} um",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax.set_xlabel("Global X (px)")
+    ax.set_ylabel("Global Y (px)")
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(True, alpha=0.25)
+
+    fig.suptitle(f"{sample_id} — FOV Positions", fontsize=16, fontweight="bold")
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"fov_positions_slice_{slice_id}.png"
+    fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.01)
     plt.close(fig)
 
 
@@ -258,13 +343,17 @@ def plot_flagged_cells(xy, flag, s=1):
     plt.show()
 
 
-def _add_slice_column(fov_df: pd.DataFrame, slices: list[SampleSlice]) -> pd.DataFrame:
+def _add_slice_column(fov_df: pd.DataFrame, fov_to_slice: dict[str, str]) -> pd.DataFrame:
     """Add a 'slice' column to the FOV DataFrame based on the provided slices."""
     fov_df = fov_df.copy()
-    slice_mapping = {}
-    for i, sample_slice in enumerate(slices):
-        for fov in sample_slice.fov_ids:
-            slice_mapping[fov] = sample_slice.slice_id
+    fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
+    fov_to_slice = {int(k): int(v) for k, v in fov_to_slice.items()}
 
-    fov_df[SLICE_ID] = fov_df[FOV].map(slice_mapping)
+    fov_df[SLICE_ID] = fov_df[FOV].map(fov_to_slice).astype("Int64")
     return fov_df
+
+
+def _get_slice_to_color(slice_ids: list[str]) -> dict[int, tuple]:
+    slice_ids = sorted({int(s) for s in slice_ids if pd.notna(s)})
+    cmap = plt.get_cmap("tab20")
+    return {sid: cmap((sid - 1) % cmap.N) for sid in slice_ids}
