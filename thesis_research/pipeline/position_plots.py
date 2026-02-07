@@ -356,4 +356,6 @@ def _add_slice_column(fov_df: pd.DataFrame, fov_to_slice: dict[str, str]) -> pd.
 def _get_slice_to_color(slice_ids: list[str]) -> dict[int, tuple]:
     slice_ids = sorted({int(s) for s in slice_ids if pd.notna(s)})
     cmap = plt.get_cmap("tab20")
-    return {sid: cmap((sid - 1) % cmap.N) for sid in slice_ids}
+
+    palette = {1: cmap(19), 2: cmap(13), 3: cmap(3), 4: cmap(5), 5: cmap(7), 6: cmap(9)}
+    return {sid: palette[sid] if sid in palette else cmap((sid - 1) % cmap.N) for sid in slice_ids}

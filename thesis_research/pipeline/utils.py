@@ -1,7 +1,7 @@
 from anndata import AnnData
 import pandas as pd
 
-from thesis_research.qc_pipeline.sample_slice import SampleSlice
+from thesis_research.pipeline.sample_slice import SampleSlice
 from thesis_research.utils.columns import SLICE, START, END, FOV, SLICE_ID, SLICE_TYPE
 from thesis_research.utils.constants import (
     FOV_SLICES_FILE_PATH,

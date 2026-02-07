@@ -1,5 +1,5 @@
 from anndata import AnnData
-from thesis_research.qc_pipeline.filters import (
+from thesis_research.pipeline.filters import (
     get_negative_system_probes,
     remove_negative_system_probes,
 )

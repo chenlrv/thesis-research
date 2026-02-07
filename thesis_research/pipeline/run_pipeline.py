@@ -7,12 +7,12 @@ import pandas as pd
 import squidpy as sq
 from anndata import AnnData
 
-from thesis_research.qc_pipeline.cell_qc_plots import run_cell_qc
-from thesis_research.qc_pipeline.fov_qc_plots import run_fov_qc
-from thesis_research.qc_pipeline.position_plots import generate_position_plots
+from thesis_research.pipeline.cell_qc_plots import run_cell_qc
+from thesis_research.pipeline.fov_qc_plots import run_fov_qc
+from thesis_research.pipeline.position_plots import generate_position_plots
 
-from thesis_research.qc_pipeline.sample_slice import SampleSlice
-from thesis_research.qc_pipeline.utils import get_slice_adata, load_slices_from_csv
+from thesis_research.pipeline.sample_slice import SampleSlice
+from thesis_research.pipeline.utils import get_slice_adata, load_slices_from_csv
 from thesis_research.utils.columns import (
     SAMPLE_ID,
     CELL_ID_UNIQUE,
@@ -32,7 +32,7 @@ from thesis_research.utils.entity_type import (
 LOGGER = logging.getLogger(__name__)
 
 
-def run_pipeline(run_exploration: bool = False):
+def run_pipeline(run_exploration: bool = False, run_qc: bool = False) -> None:
     run_id = str(uuid.uuid4())
     print(f"🧬 Starting pipeline with run_id = {run_id}...")
 
@@ -41,7 +41,11 @@ def run_pipeline(run_exploration: bool = False):
     else:
         slice_adatas = _load_slice_adatas()
 
-    run_qc_pipeline(run_id, slice_adatas)
+    if run_qc:
+        run_qc_pipeline(run_id, slice_adatas)
+
+    run_clustering_pipeline()
+
 
 
 def run_exploration_pipeline(run_id: str, save: bool = False) -> list[AnnData]:
@@ -68,10 +72,13 @@ def run_exploration_pipeline(run_id: str, save: bool = False) -> list[AnnData]:
             adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata.h5ad", compression="gzip")
             print(f"💾 Saved adata for slice {slice_id} to cache!")
 
+    print("☑️ Successfully finished exploration! ☑️")
     return list(slice_adatas.values())
 
 
-def run_qc_pipeline(run_id: str, slice_adatas: list[AnnData], fov_qc: bool = False) -> None:
+def run_qc_pipeline(
+    run_id: str, slice_adatas: list[AnnData], fov_qc: bool = False, save: bool = False
+) -> None:
     print(f"🔵 Starting QC pipeline...")
 
     processed_slice_adatas = []
@@ -96,13 +103,14 @@ def run_qc_pipeline(run_id: str, slice_adatas: list[AnnData], fov_qc: bool = Fal
         sample_adata = _merge_slice_adatas(adatas, sample_id)
         sample_adatas.append(sample_adata)
 
-    save_adatas(processed_slice_adatas, sample_adatas)
+    if save:
+        _save_adatas(processed_slice_adatas, sample_adatas)
 
     # plot_spatial_gene_positive(s, f"Lyve1 Positive Cells for sample {sample_id}")
 
     # analysis_adata = _merge_sample_adatas(adatas)
     # run_umap(run_id)
-    print("☑️ Successfully merged all sample adatas! ☑️")
+    print("☑️ Successfully finished QC! ☑️")
 
 
 def _get_adata(sample_id: str) -> AnnData:
@@ -171,7 +179,7 @@ def _merge_slice_adatas(slice_adatas: list[AnnData], sample_id: str) -> AnnData:
     return adata
 
 
-def save_adatas(slice_adatas: list[AnnData], sample_adatas: list[AnnData]) -> None:
+def _save_adatas(slice_adatas: list[AnnData], sample_adatas: list[AnnData]) -> None:
     for slice_adata in slice_adatas:
         slice_id = slice_adata.uns[SLICE_ID]
         slice_adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata.h5ad", compression="gzip")
