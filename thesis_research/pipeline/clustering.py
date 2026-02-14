@@ -7,7 +7,7 @@ import colorcet as cc
 
 
 def clustering_no_pca():
-    adata = ad.read_h5ad("D:\\thesis-research\\resources\\adata_full.h5ad")
+    adata = ad.read_h5ad("D:\\thesis-research\\resources\\cache\\adata_full.h5ad")
 
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -45,6 +45,8 @@ def clustering_no_pca():
         bbox_inches="tight",
     )
     plt.close()
+
+    adata.write_h5ad("D:\\thesis-research\\resources\\clustering\\adata_full_no_pca_clustered2.h5ad")
 
 
 # def run_clustering_pipeline():

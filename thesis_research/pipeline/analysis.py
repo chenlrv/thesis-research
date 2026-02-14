@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import umap
 import matplotlib.colors as mcolors
 
-from thesis_research.utils.columns import CELL_ID_UNIQUE
+from thesis_research.utils.columns import CELL_GLOBAL_ID
 from thesis_research.utils.entity_type import (
     GlobalEntityType,
     get_global_resource_path,
@@ -23,49 +23,49 @@ def copy_slice_info(source_adata: AnnData):
     )  # todo load adata_new here and copy slice info from source_adata, so it will hold everything
 
     if (
-        "cell_id_unique" not in source_adata.obs.columns
-        or "cell_id_unique" not in target_adata.obs.columns
+        "cell_global_id" not in source_adata.obs.columns
+        or "cell_global_id" not in target_adata.obs.columns
     ):
-        raise KeyError("Both source and target AnnData must have 'cell_id_unique' in .obs")
+        raise KeyError("Both source and target AnnData must have 'cell_global_id' in .obs")
 
     # Create a DataFrame for mapping
     mapping_df = source_adata.obs[
         [
-            "cell_id_unique",
+            "cell_global_id",
             "CenterX_global_px",
             "CenterY_global_px",
-            "sample_ID",
+            "sample_id",
             "slice_type",
-            "slice_ID",
+            "slice_id",
         ]
     ]
 
-    target_adata.obs["CenterX_global_px"] = target_adata.obs["cell_id_unique"].map(
-        mapping_df.set_index("cell_id_unique")["CenterX_global_px"]
+    target_adata.obs["CenterX_global_px"] = target_adata.obs["cell_global_id"].map(
+        mapping_df.set_index("cell_global_id")["CenterX_global_px"]
     )
-    target_adata.obs["CenterY_global_px"] = target_adata.obs["cell_id_unique"].map(
-        mapping_df.set_index("cell_id_unique")["CenterY_global_px"]
-    )
-
-    target_adata.obs["sample_ID"] = target_adata.obs["cell_id_unique"].map(
-        mapping_df.set_index("cell_id_unique")["sample_ID"]
+    target_adata.obs["CenterY_global_px"] = target_adata.obs["cell_global_id"].map(
+        mapping_df.set_index("cell_global_id")["CenterY_global_px"]
     )
 
-    target_adata.obs["slice_ID"] = target_adata.obs["cell_id_unique"].map(
-        mapping_df.set_index("cell_id_unique")["slice_ID"]
+    target_adata.obs["sample_id"] = target_adata.obs["cell_global_id"].map(
+        mapping_df.set_index("cell_global_id")["sample_id"]
     )
-    target_adata.obs["slice_type"] = target_adata.obs["cell_id_unique"].map(
-        mapping_df.set_index("cell_id_unique")["slice_type"]
+
+    target_adata.obs["slice_id"] = target_adata.obs["cell_global_id"].map(
+        mapping_df.set_index("cell_global_id")["slice_id"]
+    )
+    target_adata.obs["slice_type"] = target_adata.obs["cell_global_id"].map(
+        mapping_df.set_index("cell_global_id")["slice_type"]
     )
 
     target_adata.write_h5ad(
         "D:/thesis-research/resources/adata_with_slices.h5ad", compression="gzip"
     )
 
-    target_adata.obs["slice_ID"] = target_adata.obs["slice_ID"].astype("category")
+    target_adata.obs["slice_id"] = target_adata.obs["slice_id"].astype("category")
     sc.pl.umap(
         target_adata,
-        color="slice_ID",  # "tumor" / "healthy"
+        color="slice_id",  # "tumor" / "healthy"
     )
 
     sc.pl.umap(
@@ -102,7 +102,7 @@ def run_umap(run_id: str) -> AnnData:
     X_pca = pca_df.to_numpy(dtype=np.float32)
 
     metadata = pd.read_csv(get_global_resource_path(GlobalEntityType.METADATA_FILE), index_col=0)
-    metadata = metadata.set_index(CELL_ID_UNIQUE).loc[pca_df.index]
+    metadata = metadata.set_index(CELL_GLOBAL_ID).loc[pca_df.index]
 
     reducer = umap.UMAP(
         n_neighbors=30,
@@ -247,8 +247,8 @@ def run_clustering():
     plt.show()
     print("Saved:", out)
 
-    for sample_id in adata.obs["sample_ID"].cat.categories:
-        adata_sample = adata[adata.obs["sample_ID"] == sample_id].copy()
+    for sample_id in adata.obs["sample_id"].cat.categories:
+        adata_sample = adata[adata.obs["sample_id"] == sample_id].copy()
         plot_spatial_clusters(adata_sample, f"Spatial Cell Type Plot - Sample {sample_id}")
 
     # sc.pl.umap(

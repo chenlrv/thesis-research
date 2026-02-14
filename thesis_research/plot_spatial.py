@@ -14,8 +14,8 @@ adatas = {
 
 def plot_spatial(adata_path: str, color_column: str) -> None:
     adata = ad.read_h5ad(adata_path)
-    for sample_id in adata.obs["sample_ID"].cat.categories:
-        adata_sample = adata[adata.obs["sample_ID"] == sample_id].copy()
+    for sample_id in adata.obs["sample_id"].cat.categories:
+        adata_sample = adata[adata.obs["sample_id"] == sample_id].copy()
         plot_spatial_clusters(
             adata_sample, f"Spatial Cell Type Plot - Sample {sample_id}", color_col=color_column
         )
