@@ -17,6 +17,7 @@ def load_slices_from_csv(sample_id: str) -> list[SampleSlice]:
 
     df = pd.read_csv(fov_slices_file_path)
     slice_types = load_slice_types_from_csv(sample_id)
+    slice_mouse_ids = load_slice_mouse_ids_from_csv(sample_id)
 
     slices: list[SampleSlice] = []
     for i, group in df.sort_values([SLICE, START]).groupby(SLICE):
@@ -24,7 +25,7 @@ def load_slices_from_csv(sample_id: str) -> list[SampleSlice]:
         for low, high in group[[START, END]].to_numpy():
             fov_ids.update(range(low, high + 1))
 
-        slices.append(SampleSlice(i, fov_ids, slice_types[i]))
+        slices.append(SampleSlice(i, fov_ids, slice_types[i], slice_mouse_ids[i]))
 
     return slices
 
@@ -34,6 +35,13 @@ def load_slice_types_from_csv(sample_id: str) -> dict[int, str]:
         SLICE_TYPES_FILE_PATH.format(cosmx_resources=COSMX_RAW_DATA_DIR, sample_id=sample_id)
     )
     return dict(zip(df["slice"], df["type"]))
+
+
+def load_slice_mouse_ids_from_csv(sample_id: str) -> dict[int, str]:
+    df = pd.read_csv(
+        SLICE_TYPES_FILE_PATH.format(cosmx_resources=COSMX_RAW_DATA_DIR, sample_id=sample_id)
+    )
+    return dict(zip(df["slice"].astype(int), df["mouse_id"].astype(str)))
 
 
 def get_slice_adata(adata: AnnData, slice_id: str) -> AnnData:

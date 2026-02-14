@@ -1,13 +1,13 @@
 FOV = "fov"
 X_GLOBAL_PX = "x_global_px"
 Y_GLOBAL_PX = "y_global_px"
-SLICE_ID = "slice_ID"
+SLICE_ID = "slice_id"
 
 
 class AdataObs:
     FOV = FOV
     CELL_ID = "cell_id"
-    SLIDE_ID = "slide_ID"
+    SLIDE_ID = "slide_id"
     N_COUNT_RNA = "nCount_RNA"
     N_FEATURE_RNA = "nFeature_RNA"
     N_COUNT_NEGPROBES = "nCount_negprobes"
@@ -20,10 +20,11 @@ class AdataObs:
     AREA = "Area"
     AREA_MICROMETERS = "Area.um2"
     LOW_RNA_COUNT = "low_count"
-    SAMPLE_ID = "sample_ID"
+    SAMPLE_ID = "sample_id"
     SLICE_ID = SLICE_ID
     SLICE_TYPE = "slice_type"
-    CELL_ID_UNIQUE = "cell_id_unique"
+    MOUSE_ID = "mouse_id"
+    CELL_GLOBAL_ID = "cell_global_id"
 
 
 CELL_ID = AdataObs.CELL_ID
@@ -40,7 +41,8 @@ AREA_MICROMETERS = AdataObs.AREA_MICROMETERS
 LOW_RNA_COUNT = AdataObs.LOW_RNA_COUNT
 SAMPLE_ID = AdataObs.SAMPLE_ID
 SLICE_TYPE = AdataObs.SLICE_TYPE
-CELL_ID_UNIQUE = AdataObs.CELL_ID_UNIQUE
+MOUSE_ID = AdataObs.MOUSE_ID
+CELL_GLOBAL_ID = AdataObs.CELL_GLOBAL_ID
 
 
 class FovSlicesCol:

@@ -8,6 +8,10 @@ import squidpy as sq
 from anndata import AnnData
 
 from thesis_research.pipeline.cell_qc_plots import run_cell_qc
+from thesis_research.pipeline.filters import (
+    get_negative_system_probes,
+    remove_negative_system_probes,
+)
 from thesis_research.pipeline.fov_qc_plots import run_fov_qc
 from thesis_research.pipeline.position_plots import generate_position_plots
 
@@ -15,11 +19,12 @@ from thesis_research.pipeline.sample_slice import SampleSlice
 from thesis_research.pipeline.utils import get_slice_adata, load_slices_from_csv
 from thesis_research.utils.columns import (
     SAMPLE_ID,
-    CELL_ID_UNIQUE,
+    CELL_GLOBAL_ID,
     CELL_ID,
     FOV,
     SLICE_ID,
     SLICE_TYPE,
+    MOUSE_ID,
 )
 from thesis_research.utils.constants import COSMX_RAW_DATA_DIR, CACHE_DIR_PATH
 from thesis_research.utils.entity_type import (
@@ -90,6 +95,9 @@ def run_qc_pipeline(
             adata = run_fov_qc(adata, run_id)
 
         adata = run_cell_qc(adata, run_id)
+        probes = get_negative_system_probes(adata)
+        adata = remove_negative_system_probes(adata, probes)
+
         processed_slice_adatas.append(adata)
 
     sample_to_slices: dict[str, list[AnnData]] = defaultdict(list)
@@ -136,18 +144,23 @@ def _get_adata(sample_id: str) -> AnnData:
 
 
 def _add_unique_id_per_cell(adata: AnnData, sample_id: str) -> AnnData:
-    if CELL_ID_UNIQUE not in adata.obs.columns:
-        adata.obs[CELL_ID_UNIQUE] = adata.obs[CELL_ID].astype(str) + "_" + sample_id
+    if CELL_GLOBAL_ID not in adata.obs.columns:
+        adata.obs[CELL_GLOBAL_ID] = adata.obs[CELL_ID].astype(str) + "_" + sample_id
+
+    adata.obs_names = adata.obs[CELL_GLOBAL_ID].astype(str)
+
     return adata
 
 
 def _add_slice_metadata(adata: AnnData, slices: list[SampleSlice]) -> AnnData:
     fov_to_slice_id = {fov: s.slice_id for s in slices for fov in s.fov_ids}
     slice_id_to_type = {s.slice_id: s.slice_type for s in slices}
+    slice_id_to_mouse_id = {s.slice_id: s.mouse_id for s in slices}
 
     fovs = pd.to_numeric(adata.obs[FOV])
     adata.obs[SLICE_ID] = fovs.map(fov_to_slice_id).astype("category")
     adata.obs[SLICE_TYPE] = adata.obs[SLICE_ID].map(slice_id_to_type).astype("category")
+    adata.obs[MOUSE_ID] = adata.obs[SLICE_ID].map(slice_id_to_mouse_id).astype("category")
 
     return adata
 
@@ -202,7 +215,6 @@ def _merge_sample_adatas(adatas: list[AnnData]) -> AnnData:
         adatas,
         keys=[a.uns[SAMPLE_ID] for a in adatas],
         label=SAMPLE_ID,
-        index_unique="-",  # makes obs_names like "L321-1_1"
     )
 
 

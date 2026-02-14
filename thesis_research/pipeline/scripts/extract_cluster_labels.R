@@ -4,7 +4,7 @@ library(HieraType)
 
 # ---- inputs assumed to already exist in your session ----
 # counts   : sparse matrix (either cells x genes OR genes x cells)
-# metadata : data.frame with at least cell_id_unique (or cell_id) and clust (cluster labels)
+# metadata : data.frame with at least cell_global_id (or cell_id) and clust (cluster labels)
 
 # ---- paths ----
 setwd("D:/thesis-research/resources")
@@ -23,18 +23,18 @@ stopifnot(ncol(counts) == length(genes))
 rownames(counts) <- cells
 colnames(counts) <- genes
 
-cat("cell_id_unique length:", length(metadata$cell_id_unique), "\n")
+cat("cell_global_id length:", length(metadata$cell_global_id), "\n")
 cat("counts dim:", dim(counts), "\n")
 cat("has rownames:", !is.null(rownames(counts)), " has colnames:", !is.null(colnames(counts)), "\n")
-cat("head metadata cell_id_unique:", head(metadata$cell_id_unique), "\n")
+cat("head metadata cell_global_id:", head(metadata$cell_global_id), "\n")
 cat("head rownames(counts):", head(rownames(counts)), "\n")
 cat("head colnames(counts):", head(colnames(counts)), "\n")
 
-if (!is.null(rownames(counts))) cat("missing in rownames:", length(setdiff(metadata$cell_id_unique, rownames(counts))), "\n")
-if (!is.null(colnames(counts))) cat("missing in colnames:", length(setdiff(metadata$cell_id_unique, colnames(counts))), "\n")
+if (!is.null(rownames(counts))) cat("missing in rownames:", length(setdiff(metadata$cell_global_id, rownames(counts))), "\n")
+if (!is.null(colnames(counts))) cat("missing in colnames:", length(setdiff(metadata$cell_global_id, colnames(counts))), "\n")
 
 
-if ("cell_id_unique" %in% names(clustmap)) {
+if ("cell_global_id" %in% names(clustmap)) {
 
   # rename cluster column to "cluster" if needed
   if (!"cluster" %in% names(clustmap)) {
@@ -46,8 +46,8 @@ if ("cell_id_unique" %in% names(clustmap)) {
 
 metadata <- merge(
   metadata,
-  clustmap[, .(cell_id_unique, cluster)],
-  by = "cell_id_unique",
+  clustmap[, .(cell_global_id, cluster)],
+  by = "cell_global_id",
   all.x = TRUE
 )
 
@@ -59,14 +59,14 @@ markers_path <- file.path(outdir, "processed_data", "markers.RDS")
 
 
 stopifnot("cluster" %in% colnames(metadata))
-metadata$cell_id_unique <- as.character(metadata$cell_id_unique)
+metadata$cell_global_id <- as.character(metadata$cell_global_id)
 
 # ---- ensure counts is cells x genes and aligned to metadata$cell_id ----
 # Prefer using rownames(counts) as cell IDs if present.
-if (!is.null(rownames(counts)) && all(metadata$cell_id_unique %in% rownames(counts))) {
-  counts_cxg <- counts[metadata$cell_id_unique, , drop = FALSE]          # cells x genes
-} else if (!is.null(colnames(counts)) && all(metadata$cell_id_unique %in% colnames(counts))) {
-  counts_cxg <- Matrix::t(counts)[metadata$cell_id_unique, , drop = FALSE]  # transpose to cells x genes
+if (!is.null(rownames(counts)) && all(metadata$cell_global_id %in% rownames(counts))) {
+  counts_cxg <- counts[metadata$cell_global_id, , drop = FALSE]          # cells x genes
+} else if (!is.null(colnames(counts)) && all(metadata$cell_global_id %in% colnames(counts))) {
+  counts_cxg <- Matrix::t(counts)[metadata$cell_global_id, , drop = FALSE]  # transpose to cells x genes
 } else {
   stop("Cannot align counts to metadata$cell_id. Check row/col names of counts and metadata$cell_id.")
 }
@@ -79,7 +79,7 @@ if (TRUE) {
     counts_gxc,                 # MUST be cells x genes
     metadata = metadata,
     cluster_column = "cluster",
-    cellid_column  = "cell_id_unique"
+    cellid_column  = "cell_global_id"
   )
   saveRDS(markers, file = markers_path)
 } else {

@@ -18,14 +18,14 @@ rownames(counts) <- cells
 colnames(counts) <- genes
 
 # metadata setup + align to cells
-stopifnot("cell_id_unique" %in% colnames(metadata))
-stopifnot("sample_ID" %in% colnames(metadata))
+stopifnot("cell_global_id" %in% colnames(metadata))
+stopifnot("sample_id" %in% colnames(metadata))
 
-metadata$cell_id_unique <- as.character(metadata$cell_id_unique)
-metadata$sample_ID <- as.character(metadata$sample_ID)
-stopifnot(!anyDuplicated(metadata$cell_id_unique))
+metadata$cell_global_id <- as.character(metadata$cell_global_id)
+metadata$sample_id <- as.character(metadata$sample_id)
+stopifnot(!anyDuplicated(metadata$cell_global_id))
 
-rownames(metadata) <- metadata$cell_id_unique
+rownames(metadata) <- metadata$cell_global_id
 
 missing <- setdiff(cells, rownames(metadata))
 cat("missing cells:", length(missing), "\n")
@@ -54,9 +54,9 @@ tc <- Matrix::colSums(mat)
 # batch-aware gene frequencies (cells x genes input)
 genefreq_batch <- gene_frequency(
   x = Matrix::t(counts),  # cells x genes
-  obs = as.data.table(metadata)[, .(cell_id_unique, sample_ID)],
-  cellid_colname = "cell_id_unique",
-  batch_variable = "sample_ID"
+  obs = as.data.table(metadata)[, .(cell_global_id, sample_id)],
+  cellid_colname = "cell_global_id",
+  batch_variable = "sample_id"
 )
 
 cat("genefreq dims:", dim(genefreq_batch), "\n")
@@ -73,9 +73,9 @@ pcaobj <- sparse_quasipoisson_pca_seurat_batch(
   x,         # cells x hvgs
   totalcounts = metadata$nCount_RNA,
   grate = genefreq_batch[hvgs, ],  # hvgs x batches
-  obs = as.data.table(metadata)[, .(cell_id_unique, sample_ID)],
-  batch_variable = "sample_ID",
-  cellid_colname = "cell_id_unique",
+  obs = as.data.table(metadata)[, .(cell_global_id, sample_id)],
+  batch_variable = "sample_id",
+  cellid_colname = "cell_global_id",
   scale.max = 10,
   do.scale = TRUE,
   do.center = TRUE
