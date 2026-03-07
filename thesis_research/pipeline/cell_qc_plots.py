@@ -40,7 +40,7 @@ def _low_count_flag(
     Generate a flag for low count cells.
     """
     counts = np.asarray(counts, dtype=float)
-    threshold = min(cap, np.nanquantile(counts, quantile))
+    threshold = max(cap, np.nanquantile(counts, quantile))
     flag = counts < threshold
     return threshold, flag
 
