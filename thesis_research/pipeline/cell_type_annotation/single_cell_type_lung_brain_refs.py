@@ -6,7 +6,9 @@ from scipy.spatial import cKDTree
 import scanpy as sc
 from anndata import AnnData
 from scipy.stats import chi2
-
+from sklearn.neighbors import NearestNeighbors
+from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import PCA
 from thesis_research.utils.columns import CENTER_Y_GLOBAL_PX, CENTER_X_GLOBAL_PX
 
 
@@ -208,8 +210,6 @@ def plot_tumor_cells(
     adata.obs["predicted_cell_type"] = adata.obs["predicted_cell_type"].astype("category")
     is_tumor = adata.obs["predicted_cell_type"] == "Tumor"
 
-    adata_tumor = adata[is_tumor].copy()
-
     adata = add_is_surrounded_by_tumor_column(adata, k, r)
 
     if filter_by_surrounding:
@@ -222,7 +222,7 @@ def plot_tumor_cells(
     generate_tumor_plot(sample_id, slice_id, adata, is_background)
 
     adata_rem = adata[cells_to_keep].copy()
-    cluster_cells_no_pca(adata_rem)
+    cluster_cells(adata_rem)
 
     cluster_key = "leiden_remaining"
 
@@ -230,10 +230,9 @@ def plot_tumor_cells(
         mask_surrounded = (adata_rem.obs["predicted_cell_type"] == "Tumor") & (adata_rem.obs[cluster_key] == cluster) & (adata_rem.obs["is_surrounded_by_tumor"])
         mask_single = (adata_rem.obs["predicted_cell_type"] == "Tumor") & (adata_rem.obs[cluster_key] == cluster) & (~adata_rem.obs["is_surrounded_by_tumor"])
         adata_single = adata_rem[mask_single].copy()
-        adata_single.write_h5ad(f'{cluster}_cluster_single_no_pca.h5ad')
+        adata_single.write_h5ad(f'{cluster}_cluster_single.h5ad')
         adata_surrounded = adata_rem[mask_surrounded].copy()
-        adata_surrounded.write_h5ad(f'{cluster}_cluster_surrounded_no_pca.h5ad')
-
+        adata_surrounded.write_h5ad(f'{cluster}_cluster_surrounded.h5ad')
 
     adata.obs[cluster_key] = pd.NA
     adata.obs.loc[adata_rem.obs_names, cluster_key] = adata_rem.obs[cluster_key].astype(str).values
@@ -401,10 +400,10 @@ def pca_surrounded_single_healthy_tumor(abs_threshold: float = 0.2, delta_thresh
 
     df_results3[CELL_COL] = df_results3['cell_barcode']
 
-    zero_cluster_single = ad.read_h5ad('0_cluster_single_no_pca.h5ad')
-    zero_cluster_surrounded = ad.read_h5ad('0_cluster_surrounded_no_pca.h5ad')
-    one_cluster_single = ad.read_h5ad('1_cluster_single_no_pca.h5ad')
-    one_cluster_surrounded = ad.read_h5ad('1_cluster_surrounded_no_pca.h5ad')
+    zero_cluster_single = ad.read_h5ad('0_cluster_single.h5ad')
+    zero_cluster_surrounded = ad.read_h5ad('0_cluster_surrounded.h5ad')
+    one_cluster_single = ad.read_h5ad('1_cluster_single.h5ad')
+    one_cluster_surrounded = ad.read_h5ad('1_cluster_surrounded.h5ad')
 
     dfs = {
         "tumor_cluster0_single": zero_cluster_single.obs,
@@ -427,7 +426,6 @@ def pca_surrounded_single_healthy_tumor(abs_threshold: float = 0.2, delta_thresh
 
     keep = adata_full.obs_names.intersection(groups.index)
     adata_pca = adata_full[keep].copy()
-    adata1 = adata_pca[~adata_pca.obs_names.isin(df_results3[CELL_COL])].copy()
 
 
     adata_pca.obs["group"] = groups.loc[keep, "group"].astype("category")
@@ -503,6 +501,9 @@ def pca_surrounded_single_healthy_tumor(abs_threshold: float = 0.2, delta_thresh
 
     print()
 
+
+
+_get_tumor_ref_mask(None)
 plot_tumor_cells("L321", 1, abs_threshold=0.2, delta_threshold=0.08, k=5, r=500, filter_by_surrounding=False)
 pca_surrounded_single_healthy_tumor()
 # plot_cell_type("Tumor", "red", abs_threshold=0.2, delta_threshold=0.08)
