@@ -33,6 +33,10 @@ def identify_tumor_cells(
     tumor_ref_mask_sub = tumor_ref_mask[subset_mask]
     tumor_candidate_mask_sub = tumor_candidate_mask[subset_mask]
 
+    adata_sub.obs["is_healthy_ref"] = healthy_ref_mask_sub
+    adata_sub.obs["is_tumor_ref"] = tumor_ref_mask_sub
+    adata_sub.obs["is_tumor_candidate"] = tumor_candidate_mask_sub
+
     # Standard preprocessing for PCA space
     sc.pp.normalize_total(adata_sub, target_sum=1e4)
     sc.pp.log1p(adata_sub)
@@ -136,6 +140,8 @@ def identify_tumor_cells(
 
     # Draw the boundary line (where probability is 0.5)
     plt.contour(xx, yy, Z, levels=[0.5], colors='black', linewidths=2)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout(rect=[0, 0, 1, 1])
     plt.show()
 
     # ------------------------------
@@ -155,6 +161,7 @@ def identify_tumor_cells(
 
     tumor_ref_mask_spatial = np.asarray(_get_tumor_ref_mask(adata1))
     tumor_candidate_mask_spatial = np.asarray(_get_tumor_candidates_mask(adata1))
+
 
     # background cells = not trusted tumor refs and not tumor candidates
     background_healthy_mask_spatial = (
@@ -201,6 +208,29 @@ def identify_tumor_cells(
     adata_sub.obs["healthy_like_seed"] = healthy_like_seed_sub
     adata_sub.obs["healthy_support_spatial_frac_sub"] = healthy_support_spatial_frac_sub
     adata_sub.obs["likely_mislabeled_healthy"] = likely_mislabeled_healthy
+
+    is_real_tumor = (
+            adata_sub.obs["is_tumor_ref"] &
+            (~adata_sub.obs["likely_mislabeled_healthy"])
+    )
+
+    adata_tumor = adata_sub[is_real_tumor].copy()
+    adata_t = adata_tumor.copy()
+    sc.pp.normalize_total(adata_t, target_sum=1e4)
+    sc.pp.log1p(adata_t)
+
+    # optional but often helpful
+    # sc.pp.highly_variable_genes(adata_t, n_top_genes=1000, flavor="seurat")
+    # adata_t = adata_t[:, adata_t.var["highly_variable"]].copy()
+
+    sc.pp.scale(adata_t, max_value=10)
+    sc.tl.pca(adata_t, n_comps=min(n_comps, adata_t.n_obs - 1, adata_t.n_vars - 1))
+
+    n_pcs_eff = min(n_pcs, adata_t.obsm["X_pca"].shape[1])
+    sc.pp.neighbors(adata_t, n_neighbors=k, n_pcs=n_pcs_eff)
+    sc.tl.leiden(adata_t, resolution=0.3, key_added="tumor_subcluster")
+    sc.tl.umap(adata_t)
+
     return adata_sub
 
 
