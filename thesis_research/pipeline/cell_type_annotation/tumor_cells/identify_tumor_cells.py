@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import anndata as ad
@@ -11,7 +13,13 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from scipy.sparse import issparse
 from thesis_research.utils.columns import CENTER_Y_GLOBAL_PX, CENTER_X_GLOBAL_PX
+from sklearn.model_selection import StratifiedKFold, cross_validate
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+from sklearn.model_selection import StratifiedKFold, cross_validate
 
+BASE_DIR = r"D:/thesis-research/"
 
 def identify_tumor_cells(
     adata,
@@ -23,9 +31,14 @@ def identify_tumor_cells(
 ):
     adata = adata.copy()
 
-    healthy_ref_mask = _get_healthy_ref_mask(adata) #cells marked as tumor but they are 100% healthy
-    tumor_ref_mask = _get_tumor_ref_mask(adata) #cells marked as tumor with very high confidence
-    tumor_candidate_mask = _get_tumor_candidates_mask(adata) #cells marked as tumor but potentially mislabeled (lower confidence)
+    healthy_ref_ids = _get_healthy_ref_ids(adata) #cells marked as tumor but they are 100% healthy
+    tumor_ref_ids = _get_tumor_ref_ids(adata) #cells marked as tumor with very high confidence
+    tumor_candidate_ids = _get_tumor_candidates_ids(adata) #cells marked as tumor but potentially mislabeled (lower confidence)
+
+    healthy_ref_mask = adata.obs_names.isin(healthy_ref_ids)
+    tumor_ref_mask = adata.obs_names.isin(tumor_ref_ids)
+    tumor_candidate_mask = adata.obs_names.isin(tumor_candidate_ids)
+
     subset_mask = healthy_ref_mask | tumor_ref_mask | tumor_candidate_mask
     adata_sub = adata[subset_mask].copy()
 
@@ -156,11 +169,11 @@ def identify_tumor_cells(
 
     # ---------- score 3: fraction of healthy nearest neighbors in spatial space ----------
     spatial_cols = ["CenterX_global_px", "CenterY_global_px"]
-    adata1 = ad.read_h5ad("D:\\thesis-research\\resources\\cache\\slice_1_adata.h5ad")
+    adata1 = ad.read_h5ad("/resources/cache/slice_1_adata.h5ad")
     X_spatial = adata1.obs[spatial_cols].to_numpy()
 
-    tumor_ref_mask_spatial = np.asarray(_get_tumor_ref_mask(adata1))
-    tumor_candidate_mask_spatial = np.asarray(_get_tumor_candidates_mask(adata1))
+    tumor_ref_mask_spatial = adata1.obs_names.isin(tumor_ref_ids)
+    tumor_candidate_mask_spatial = adata1.obs_names.isin(tumor_candidate_ids)
 
 
     # background cells = not trusted tumor refs and not tumor candidates
@@ -214,8 +227,9 @@ def identify_tumor_cells(
             (~adata_sub.obs["likely_mislabeled_healthy"])
     )
 
-    adata_tumor = adata_sub[is_real_tumor].copy()
-    adata_t = adata_tumor.copy()
+    tumor_ids = adata_sub.obs_names[is_real_tumor]
+    adata_t = adata[adata.obs_names.isin(tumor_ids)].copy()
+
     sc.pp.normalize_total(adata_t, target_sum=1e4)
     sc.pp.log1p(adata_t)
 
@@ -231,11 +245,325 @@ def identify_tumor_cells(
     sc.tl.leiden(adata_t, resolution=0.3, key_added="tumor_subcluster")
     sc.tl.umap(adata_t)
 
+    sc.pl.pca(adata_t, color="tumor_subcluster", show=True)
+
     return adata_sub
 
 
+def logistic_regression_cv(adata):
+    adata = adata.copy()
+    healthy_ref_ids = _get_healthy_ref_ids(adata) #cells marked as tumor but they are 100% healthy
+    tumor_ref_ids = _get_tumor_ref_ids(adata) #cells marked as tumor with very high confidence
+    tumor_candidate_ids = _get_tumor_candidates_ids(adata) #cells marked as tumor but potentially mislabeled (lower confidence)
+
+    healthy_ref_mask = adata.obs_names.isin(healthy_ref_ids)
+    tumor_ref_mask = adata.obs_names.isin(tumor_ref_ids)
+    tumor_candidate_mask = adata.obs_names.isin(tumor_candidate_ids)
+
+    ref_mask = np.asarray(healthy_ref_mask | tumor_ref_mask)
+
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+
+    X_ref = adata.X[ref_mask]
+    if issparse(X_ref):
+        X_ref = X_ref.toarray()
+    else:
+        X_ref = np.asarray(X_ref)
+
+    X_cand = adata.X[tumor_candidate_mask]
+    if issparse(X_cand):
+        X_cand = X_cand.toarray()
+    else:
+        X_cand = np.asarray(X_cand)
+
+    # labels: 1 = healthy, 0 = tumor
+    y_ref = np.asarray(healthy_ref_mask[ref_mask]).astype(int)
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    pipe = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression(
+            penalty="l2",
+            C=1.0,
+            class_weight="balanced",
+            max_iter=5000,
+            solver="liblinear",
+            random_state=42,
+        ))
+    ])
+
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "roc_auc": "roc_auc",
+        "ap": "average_precision",
+    }
+
+    cv_res = cross_validate(
+        pipe,
+        X_ref,
+        y_ref,
+        cv=cv,
+        scoring=scoring,
+        return_train_score=True,
+        n_jobs=-1,
+    )
+
+    for k, v in cv_res.items():
+        if k.startswith("test_"):
+            print(k, v.mean(), v.std())
+
+    # apply learned logistic regression to tumor candidates and see how well it separates them
+
+    pipe.fit(X_ref, y_ref)
+
+    scores = pipe.predict_proba(X_ref)[:, 1]
+
+
+    # Extract coefficients
+    coefs = pipe.named_steps["clf"].coef_[0]
+
+    gene_df = pd.DataFrame({
+        "gene": adata.var_names,
+        "coef": coefs
+    })
+
+    # Top healthy-associated genes
+    top_healthy = gene_df.sort_values("coef", ascending=False).head(30)
+
+    # Top tumor-associated genes
+    top_tumor = gene_df.sort_values("coef", ascending=True).head(30)
+
+    print("Top healthy-associated genes:")
+    print(top_healthy)
+
+    print("\nTop tumor-associated genes:")
+    print(top_tumor)
+
+    X_vis_all = np.vstack([X_ref, X_cand])
+
+    scaler_vis = StandardScaler()
+    X_vis_all_scaled = scaler_vis.fit_transform(X_vis_all)
+
+    pca_vis = PCA(n_components=2, random_state=42)
+    X_vis_all_2d = pca_vis.fit_transform(X_vis_all_scaled)
+
+    n_ref = X_ref.shape[0]
+    X_ref_2d = X_vis_all_2d[:n_ref]
+    X_cand_2d = X_vis_all_2d[n_ref:]
+
+    df_plot = pd.DataFrame(X_ref_2d, columns=["PC1", "PC2"])
+    df_plot["Status"] = np.where(y_ref == 1, "Healthy Ref", "Tumor Ref")
+
+    df_cand = pd.DataFrame(X_cand_2d, columns=["PC1", "PC2"])
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+
+    sns.scatterplot(
+        data=df_cand,
+        x="PC1", y="PC2",
+        color="lightgray",
+        alpha=0.3,
+        s=10,
+        label="Candidates",
+        ax=ax
+    )
+
+    sns.scatterplot(
+        data=df_plot,
+        x="PC1", y="PC2",
+        hue="Status",
+        palette={"Healthy Ref": "dodgerblue", "Tumor Ref": "firebrick"},
+        s=40,
+        edgecolor="black",
+        alpha=0.8,
+        ax=ax
+    )
+
+    # L2 logistic regression in 2D ONLY for boundary visualization
+    clf_l2_plot = LogisticRegression(
+        penalty="l2",
+        C=1.0,
+        class_weight="balanced",
+        solver="liblinear",
+        max_iter=5000,
+        random_state=42
+    )
+    clf_l2_plot.fit(X_ref_2d, y_ref)
+
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    xx, yy = np.meshgrid(
+        np.linspace(x_min, x_max, 300),
+        np.linspace(y_min, y_max, 300)
+    )
+
+    grid = np.c_[xx.ravel(), yy.ravel()]
+    Z = clf_l2_plot.predict_proba(grid)[:, 1].reshape(xx.shape)
+
+    ax.contour(xx, yy, Z, levels=[0.5], colors="black", linewidths=2)
+
+    ax.set_title("Logistic Regression (L2) Decision Boundary - 2D PCA visualization")
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left")
+    fig.tight_layout(rect=[0, 0, 0.82, 1])
+    plt.show()
+
+
+def random_forest_cv(adata):
+    adata = adata.copy()
+    healthy_ref_ids = _get_healthy_ref_ids(adata)  # cells marked as tumor but they are 100% healthy
+    tumor_ref_ids = _get_tumor_ref_ids(adata)  # cells marked as tumor with very high confidence
+    tumor_candidate_ids = _get_tumor_candidates_ids(
+        adata)  # cells marked as tumor but potentially mislabeled (lower confidence)
+
+    healthy_ref_mask = adata.obs_names.isin(healthy_ref_ids)
+    tumor_ref_mask = adata.obs_names.isin(tumor_ref_ids)
+    tumor_candidate_mask = adata.obs_names.isin(tumor_candidate_ids)
+
+    ref_mask = np.asarray(healthy_ref_mask | tumor_ref_mask)
+
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+
+    X_ref = adata.X[ref_mask]
+    if issparse(X_ref):
+        X_ref = X_ref.toarray()
+    else:
+        X_ref = np.asarray(X_ref)
+
+    X_cand = adata.X[tumor_candidate_mask]
+    if issparse(X_cand):
+        X_cand = X_cand.toarray()
+    else:
+        X_cand = np.asarray(X_cand)
+
+    # labels: 1 = healthy, 0 = tumor
+    y_ref = np.asarray(healthy_ref_mask[ref_mask]).astype(int)
+
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import StratifiedKFold, cross_validate
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    rf = RandomForestClassifier(
+        n_estimators=300,
+        max_depth=None,
+        min_samples_split=2,
+        min_samples_leaf=1,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1,
+    )
+
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "roc_auc": "roc_auc",
+        "ap": "average_precision",
+    }
+
+    cv_res_rf = cross_validate(
+        rf,
+        X_ref,
+        y_ref,
+        cv=cv,
+        scoring=scoring,
+        return_train_score=True,
+        n_jobs=-1,
+    )
+
+    for k, v in cv_res_rf.items():
+        if k.startswith("test_"):
+            print(k, v.mean(), v.std())
+
+    for k, v in cv_res_rf.items():
+        if k.startswith("train_"):
+            print(k, v.mean())
+
+
+def xgboost_cv(adata):
+    adata = adata.copy()
+    healthy_ref_ids = _get_healthy_ref_ids(adata)  # cells marked as tumor but they are 100% healthy
+    tumor_ref_ids = _get_tumor_ref_ids(adata)  # cells marked as tumor with very high confidence
+    tumor_candidate_ids = _get_tumor_candidates_ids(
+        adata)  # cells marked as tumor but potentially mislabeled (lower confidence)
+
+    healthy_ref_mask = adata.obs_names.isin(healthy_ref_ids)
+    tumor_ref_mask = adata.obs_names.isin(tumor_ref_ids)
+    tumor_candidate_mask = adata.obs_names.isin(tumor_candidate_ids)
+
+    ref_mask = np.asarray(healthy_ref_mask | tumor_ref_mask)
+
+    sc.pp.normalize_total(adata, target_sum=1e4)
+    sc.pp.log1p(adata)
+
+    X_ref = adata.X[ref_mask]
+    if issparse(X_ref):
+        X_ref = X_ref.toarray()
+    else:
+        X_ref = np.asarray(X_ref)
+
+    X_cand = adata.X[tumor_candidate_mask]
+    if issparse(X_cand):
+        X_cand = X_cand.toarray()
+    else:
+        X_cand = np.asarray(X_cand)
+
+    # labels: 1 = healthy, 0 = tumor
+    y_ref = np.asarray(healthy_ref_mask[ref_mask]).astype(int)
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    xgb = XGBClassifier(
+        n_estimators=300,
+        max_depth=4,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        reg_lambda=1.0,
+        objective="binary:logistic",
+        eval_metric="logloss",
+        random_state=42,
+        n_jobs=-1,
+    )
+
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "roc_auc": "roc_auc",
+        "ap": "average_precision",
+    }
+
+    cv_res_xgb = cross_validate(
+        xgb,
+        X_ref,
+        y_ref,
+        cv=cv,
+        scoring=scoring,
+        return_train_score=True,
+        n_jobs=-1,
+    )
+
+    for k, v in cv_res_xgb.items():
+        if k.startswith("test_"):
+            print(k, v.mean(), v.std())
+
+    for k, v in cv_res_xgb.items():
+        if k.startswith("train_"):
+            print(k, v.mean())
+
 def plot_spatial_score_threshold(adata_sub, threshold=0.7):
-    adata = ad.read_h5ad(r"D:\thesis-research\resources\cache\slice_1_adata.h5ad")
+    adata = ad.read_h5ad(r"/resources/cache/slice_1_adata.h5ad")
 
     # copy the score from adata_sub into the full slice object by cell id
     adata.obs["healthy_spatial_prob"] = (
@@ -295,10 +623,10 @@ def plot_spatial_score_threshold(adata_sub, threshold=0.7):
     plt.legend(markerscale=4, frameon=False)
     plt.show()
 
-def _get_healthy_ref_mask(adata: AnnData):
+def _get_healthy_ref_ids(adata: AnnData):
     CELL_COL = 'cell_barcode'
     df_results3 = pd.read_csv(
-        fr"D:\thesis-research\outputs\cell_annotation\L321\05\slice_3_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
+        fr"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_3_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
     df_results3 = df_results3[df_results3['predicted_cell_type'] == 'Tumor']
     df_results3['next_best_score'] = df_results3[['score_brain_struct', 'score_brain_immune']].max(axis=1)
     df_results3['delta_score'] = abs(df_results3['score_tumor'] - df_results3['next_best_score'])
@@ -310,13 +638,12 @@ def _get_healthy_ref_mask(adata: AnnData):
         (df_results3['score_tumor'] > df_results3['next_best_score'])
         ]
 
-    df_results3[CELL_COL] = df_results3['cell_barcode']
-    return adata.obs_names.isin(df_results3[CELL_COL])
+    return set(df_results3[CELL_COL].astype(str))
 
-def _get_tumor_ref_mask(adata: AnnData):
+def _get_tumor_ref_ids(adata: AnnData):
     CELL_COL = 'cell_barcode'
     df_results1 = pd.read_csv(
-        fr"D:\thesis-research\outputs\cell_annotation\L321\05\slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
+        fr"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
     df_results1 = df_results1[df_results1['predicted_cell_type'] == 'Tumor']
     df_results1['next_best_score'] = df_results1[['score_brain_struct', 'score_brain_immune']].max(axis=1)
     df_results1['delta_score'] = abs(df_results1['score_tumor'] - df_results1['next_best_score'])
@@ -328,12 +655,12 @@ def _get_tumor_ref_mask(adata: AnnData):
         (df_results1['score_tumor'] > df_results1['next_best_score'])
         ]
 
-    return adata.obs_names.isin(df_results1[CELL_COL])
+    return set(df_results1[CELL_COL].astype(str))
 
-def _get_tumor_candidates_mask(adata: AnnData):
+def _get_tumor_candidates_ids(adata: AnnData):
     CELL_COL = 'cell_barcode'
     df_results1 = pd.read_csv(
-        fr"D:\thesis-research\outputs\cell_annotation\L321\05\slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
+        fr"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv")
     df_results1 = df_results1[df_results1['predicted_cell_type'] == 'Tumor']
     df_results1['next_best_score'] = df_results1[['score_brain_struct', 'score_brain_immune']].max(axis=1)
     df_results1['delta_score'] = abs(df_results1['score_tumor'] - df_results1['next_best_score'])
@@ -345,9 +672,19 @@ def _get_tumor_candidates_mask(adata: AnnData):
         (df_results1['score_tumor'] > df_results1['next_best_score'])
         ]
 
-    return adata.obs_names.isin(df_results1[CELL_COL])
+    return set(df_results1[CELL_COL].astype(str))
 
 
-adata_new = identify_tumor_cells(
-    adata = ad.read_h5ad(r"D:\thesis-research\resources\cache\sample_L321_adata.h5ad")
+# random_forest_cv(
+#     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
+# )
+
+xgboost_cv(
+    adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
 )
+# logistic_regression_cv(
+#     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
+# )
+# adata_new = identify_tumor_cells(
+#     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
+# )
