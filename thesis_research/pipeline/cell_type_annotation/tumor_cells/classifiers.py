@@ -401,12 +401,12 @@ def _plot_tumor_cells(healthy_cells, classifier_name):
         edgecolors='none',
         label='D122 Tumor Cells'
     )
-    plt.title(f"L321 slice 1 spatial Mapping tumor cells\nclassifier {classifier_name} - {len(cells_to_keep)} tumor cells out of {len(is_tumor)}, filtered {len(healthy_cells)}", fontsize=15)
+    plt.title(f"L321 slice 1 spatial Mapping tumor cells\nclassifier {classifier_name} - {len(cells_to_keep.sum())} tumor cells out of {is_tumor.sum()}, filtered {len(healthy_cells)}", fontsize=15)
     plt.axis('equal')
     plt.axis('off')
     plt.show()
 
 
-    run_classifiers_compare_and_score(
-        adata = ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
-    )
+run_classifiers_compare_and_score(
+    adata = ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad")
+)
