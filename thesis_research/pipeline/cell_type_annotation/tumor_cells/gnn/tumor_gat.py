@@ -9,6 +9,8 @@ import scanpy as sc
 import pandas as pd
 import anndata as ad
 
+from thesis_research.utils.columns import CELL_GLOBAL_ID
+
 BASE_DIR = r"D:/thesis-research/"
 
 # -----------------------------
@@ -24,6 +26,11 @@ if torch.cuda.is_available():
 def prepare_gnn_labels(adata_slice_1, adata_slice_3, df_results_slice_1):
     # --- SLICE 1 LOGIC ---
     # 1. Identify High-Confidence Tumors using your specific criteria
+    df_results_slice_1["next_best_score"] = df_results_slice_1[["score_brain_struct", "score_brain_immune"]].max(
+        axis=1
+    )
+    df_results_slice_1["delta_score"] = abs(df_results_slice_1["score_tumor"] - df_results_slice_1["next_best_score"])
+
     tumor_mask = (
         (df_results_slice_1["predicted_cell_type"] == "Tumor")
         & (df_results_slice_1["score_tumor"] > 0.5)
@@ -43,7 +50,7 @@ def prepare_gnn_labels(adata_slice_1, adata_slice_3, df_results_slice_1):
     adata_slice_1.obs["gnn_train_mask"] = False  # Default to ignore
 
     # Set Tumor Anchors
-    is_tumor = adata_slice_1.obs["cell_barcode"].isin(high_conf_tumor_barcodes)
+    is_tumor = adata_slice_1.obs[CELL_GLOBAL_ID].isin(high_conf_tumor_barcodes)
     adata_slice_1.obs.loc[is_tumor, "gnn_label"] = 1
     adata_slice_1.obs.loc[is_tumor, "gnn_train_mask"] = True
 
@@ -51,16 +58,16 @@ def prepare_gnn_labels(adata_slice_1, adata_slice_3, df_results_slice_1):
 
     # Map raw SingleR info to adata_slice_1.obs
     # This stores the "Before" state for comparison
-    adata_slice_1.obs["singler_conf"] = adata_slice_1.obs["cell_barcode"].map(conf_map)
+    adata_slice_1.obs["singler_conf"] = adata_slice_1.obs[CELL_GLOBAL_ID].map(conf_map)
     adata_slice_1.obs["singler_label"] = (
-            adata_slice_1.obs["cell_barcode"].map(
+            adata_slice_1.obs[CELL_GLOBAL_ID].map(
                 dict(zip(df_results_slice_1["cell_barcode"], df_results_slice_1["predicted_cell_type"]))
             ) == "Tumor"
     ).astype(int)
 
 
     # Set Healthy Anchors (ONLY high confidence ones)
-    is_healthy = adata_slice_1.obs["cell_barcode"].isin(high_conf_healthy_barcodes)
+    is_healthy = adata_slice_1.obs[CELL_GLOBAL_ID].isin(high_conf_healthy_barcodes)
     adata_slice_1.obs.loc[is_healthy, "gnn_label"] = 0
     adata_slice_1.obs.loc[is_healthy, "gnn_train_mask"] = True
 
@@ -75,7 +82,16 @@ def prepare_gnn_labels(adata_slice_1, adata_slice_3, df_results_slice_1):
     adata_slice_1 = _run_pca(adata_slice_1)
     adata_slice_3 = _run_pca(adata_slice_3)
 
-    print(f"Mapped {adata_slice_1.obs['gnn_train_mask'].sum()} anchors out of {len(adata_slice_1)} cells.")
+    print(f"Mapped {adata_slice_1.obs['gnn_train_mask'].sum()} slice 1 anchors out of {len(adata_slice_1)} cells.")
+    print(f"Mapped {adata_slice_3.obs['gnn_train_mask'].sum()} slice 3 anchors out of {len(adata_slice_3)} cells.")
+
+    t_count = adata_slice_1.obs[adata_slice_1.obs["gnn_label"] == 1]["gnn_train_mask"].sum()
+    h_count = adata_slice_1.obs[adata_slice_1.obs["gnn_label"] == 0]["gnn_train_mask"].sum() + len(adata_slice_3)
+
+    if t_count == 0 or h_count == 0:
+        print(f"CRITICAL ERROR: Found {t_count} tumor anchors and {h_count} healthy anchors.")
+        print(f"Check thresholds: Tumor Mask length = {tumor_mask.sum()}")
+
     return adata_slice_1, adata_slice_3
 
 
@@ -85,7 +101,7 @@ def prepare_gnn_labels(adata_slice_1, adata_slice_3, df_results_slice_1):
 def create_advanced_graph(
     adata_slice,
     is_slice_3: bool = False,
-    conf_threshold: float = 0.95,
+    conf_threshold: float = 0.5,
     spatial_k: int = 6,
     feature_k: int = 10,
     pca_key: str = "X_pca",
@@ -244,11 +260,11 @@ def get_predictions(model, data):
 # -----------------------------
 def _run_pca(adata_slice):
     adata_copy = adata_slice.copy()
-    sc.pp.normalize_total(adata_slice, target_sum=1e4)
-    sc.pp.log1p(adata_slice)
+    sc.pp.normalize_total(adata_copy, target_sum=1e4)
+    sc.pp.log1p(adata_copy)
     # sc.pp.highly_variable_genes(adata_slice, n_top_genes=2000, subset=True)
-    sc.pp.scale(adata_slice, max_value=10)
-    sc.tl.pca(adata_slice, n_comps=50)
+    sc.pp.scale(adata_copy, max_value=10)
+    sc.tl.pca(adata_copy, n_comps=50)
 
     return adata_copy
 
