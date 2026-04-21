@@ -33,8 +33,8 @@ def identify_tumor_cells(
 ):
     adata = adata.copy()
 
-    healthy_ref_ids = _get_healthy_ref_ids(adata)  # cells marked as tumor but they are 100% healthy
-    tumor_ref_ids = _get_tumor_ref_ids(adata)  # cells marked as tumor with very high confidence
+    healthy_ref_ids = _get_healthy_ref_ids()  # cells marked as tumor but they are 100% healthy
+    tumor_ref_ids = _get_tumor_ref_ids()  # cells marked as tumor with very high confidence
     tumor_candidate_ids = _get_tumor_candidates_ids(
         adata
     )  # cells marked as tumor but potentially mislabeled (lower confidence)
@@ -317,7 +317,7 @@ def plot_spatial_score_threshold(adata_sub, threshold=0.7):
 def _plot_tumor_cells(healthy_cells, classifier_name, pca):
     adata = ad.read_h5ad(r"D:\thesis-research\resources\cache\slice_1_adata.h5ad")
     df_results = pd.read_csv(
-        r"D:\thesis-research\outputs\cell_annotation\L321\05\slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+        r"D:/thesis-research/outputs/cell_annotation/L321/05/1/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
     )
     df_results = df_results[df_results["predicted_cell_type"] == "Tumor"]
     df_results["next_best_score"] = df_results[["score_brain_struct", "score_brain_immune"]].max(
@@ -338,8 +338,8 @@ def _plot_tumor_cells(healthy_cells, classifier_name, pca):
         right_on="cell_barcode",
         how="left",
     ).set_index("cell_barcode")
-    adata.obs[CENTER_Y_GLOBAL_PX] = -adata.obs[CENTER_Y_GLOBAL_PX]
-    adata.obs[CENTER_X_GLOBAL_PX] = -adata.obs[CENTER_X_GLOBAL_PX]
+    # adata.obs[CENTER_Y_GLOBAL_PX] = -adata.obs[CENTER_Y_GLOBAL_PX]
+    # adata.obs[CENTER_X_GLOBAL_PX] = -adata.obs[CENTER_X_GLOBAL_PX]
     adata.obsm["spatial"] = np.stack(
         [adata.obs[CENTER_X_GLOBAL_PX].values, adata.obs[CENTER_Y_GLOBAL_PX].values], axis=1
     )
@@ -375,8 +375,16 @@ def _plot_tumor_cells(healthy_cells, classifier_name, pca):
         edgecolors="none",
         label="D122 Tumor Cells",
     )
+
+    n_initial = is_tumor.sum()
+    n_kept = cells_to_keep.sum()
+    n_filtered = n_initial - n_kept
+
     plt.title(
-        f"L321 slice 1 spatial Mapping tumor cells\nPCA={pca}\n{classifier_name}\n{cells_to_keep.sum()} tumor cells out of {is_tumor.sum()}, filtered {len(healthy_cells)}",
+        f"L321 slice 1 spatial Mapping tumor cells\n"
+        f"PCA={pca}\n"
+        f"{classifier_name}\n"
+        f"{n_kept} tumor cells out of {n_initial}, filtered {n_filtered}",
         fontsize=15,
     )
     plt.axis("equal")
@@ -384,10 +392,10 @@ def _plot_tumor_cells(healthy_cells, classifier_name, pca):
     plt.show()
 
 
-def _get_healthy_ref_ids(adata: AnnData):
+def _get_healthy_ref_ids():
     CELL_COL = "cell_barcode"
     df_results3 = pd.read_csv(
-        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_3_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/3/slice_3_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
     )
     df_results3 = df_results3[df_results3["predicted_cell_type"] == "Tumor"]
     df_results3["next_best_score"] = df_results3[["score_brain_struct", "score_brain_immune"]].max(
@@ -397,7 +405,7 @@ def _get_healthy_ref_ids(adata: AnnData):
 
     df_results3 = df_results3[
         (df_results3["predicted_cell_type"] == "Tumor")
-        & (df_results3["score_tumor"] > 0.2)  # New: Absolute match filter
+        & (df_results3["score_tumor"] > 0.3)  # New: Absolute match filter
         & (df_results3["delta_score"] > 0.08)
         & (df_results3["score_tumor"] > df_results3["next_best_score"])
     ]
@@ -405,10 +413,10 @@ def _get_healthy_ref_ids(adata: AnnData):
     return set(df_results3[CELL_COL].astype(str))
 
 
-def _get_healthy_ref_ids_slice_1(adata: AnnData):
+def _get_healthy_ref_ids_slice_1():
     CELL_COL = "cell_barcode"
     df_results1 = pd.read_csv(
-        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/1/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
     )
     df_results1 = df_results1[df_results1["predicted_cell_type"] != "Tumor"]
     score_cols = ["score_tumor", "score_brain_struct", "score_brain_immune"]
@@ -429,10 +437,10 @@ def _get_healthy_ref_ids_slice_1(adata: AnnData):
 
 
 
-def _get_tumor_ref_ids(adata: AnnData):
+def _get_tumor_ref_ids():
     CELL_COL = "cell_barcode"
     df_results1 = pd.read_csv(
-        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/1/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
     )
     df_results1 = df_results1[df_results1["predicted_cell_type"] == "Tumor"]
     df_results1["next_best_score"] = df_results1[["score_brain_struct", "score_brain_immune"]].max(
@@ -442,7 +450,7 @@ def _get_tumor_ref_ids(adata: AnnData):
 
     df_results1 = df_results1[
         (df_results1["predicted_cell_type"] == "Tumor")
-        & (df_results1["score_tumor"] > 0.5)
+        & (df_results1["score_tumor"] >= 0.5)
         & (df_results1["delta_score"] > 0.08)
         & (df_results1["score_tumor"] > df_results1["next_best_score"])
     ]
@@ -450,12 +458,15 @@ def _get_tumor_ref_ids(adata: AnnData):
     return set(df_results1[CELL_COL].astype(str))
 
 
-def _get_tumor_candidates_ids(adata: AnnData):
+def _get_tumor_candidates_ids(annotation_df: pd.DataFrame = None):
     CELL_COL = "cell_barcode"
-    df_results1 = pd.read_csv(
-        rf"{BASE_DIR}/outputs/cell_annotation/L321/05/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
-    )
-    df_results1 = df_results1[df_results1["predicted_cell_type"] == "Tumor"]
+    if annotation_df is not None:
+        df_results1 = annotation_df
+    else:
+        df_results1 = pd.read_csv(
+            rf"{BASE_DIR}/outputs/cell_annotation/L321/05/1/slice_1_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+        )
+    df_results1 = df_results1[df_results1["predicted_cell_type"] == "Tumor"].copy()
     df_results1["next_best_score"] = df_results1[["score_brain_struct", "score_brain_immune"]].max(
         axis=1
     )

@@ -28,18 +28,13 @@ from thesis_research.utils.columns import CENTER_X_GLOBAL_PX, CENTER_Y_GLOBAL_PX
 BASE_DIR = r"D:/thesis-research/"
 
 
-def train_classifiers(adata, healthy_refs_same_slice, pca=False, n_splits=5, random_state=42):
+def train_classifiers(adata, pca=False, n_splits=5, random_state=42):
     """
     Trains classifiers on a reference AnnData and returns the models.
     """
     adata_proc = adata.copy()
-
-    # Identify reference cells using your existing helpers
-    if healthy_refs_same_slice:
-        healthy_ref_ids = _get_healthy_ref_ids_slice_1(adata_proc)
-    else:
-        healthy_ref_ids = _get_healthy_ref_ids(adata_proc)
-    tumor_ref_ids = _get_tumor_ref_ids(adata_proc)
+    healthy_ref_ids = _get_healthy_ref_ids()
+    tumor_ref_ids = _get_tumor_ref_ids()
 
     healthy_ref_mask = adata_proc.obs_names.isin(healthy_ref_ids)
     tumor_ref_mask = adata_proc.obs_names.isin(tumor_ref_ids)
@@ -53,8 +48,8 @@ def train_classifiers(adata, healthy_refs_same_slice, pca=False, n_splits=5, ran
     y_ref = np.asarray(healthy_ref_mask[ref_mask]).astype(int)
 
     # Calculate weights and get model definitions
-    n_positive = int((y_ref == 1).sum())
-    n_negative = int((y_ref == 0).sum())
+    n_positive = int((y_ref == 1).sum()) # healthy
+    n_negative = int((y_ref == 0).sum()) # tumor
     scale_pos_weight = n_negative / max(n_positive, 1)
 
     if pca:
@@ -77,7 +72,6 @@ def train_classifiers(adata, healthy_refs_same_slice, pca=False, n_splits=5, ran
 
 def run_classifiers_compare_and_score(
     adata,
-    healthy_refs_same_slice,
     pca = False,
     n_splits=5,
     random_state=42,
@@ -105,14 +99,11 @@ def run_classifiers_compare_and_score(
         - "models": fitted models dict
         - "logreg_gene_coefficients": dataframe of logistic coefficients
     """
-    fitted_models, metrics_df, oof_probs = train_classifiers(adata, healthy_refs_same_slice, pca, n_splits, random_state)
+    fitted_models, metrics_df, oof_probs = train_classifiers(adata, pca, n_splits, random_state)
     adata_raw = adata.copy()
     adata_proc = adata.copy()
 
-    if healthy_refs_same_slice:
-        healthy_ref_ids = _get_healthy_ref_ids_slice_1()
-    else:
-        healthy_ref_ids = _get_healthy_ref_ids()
+    healthy_ref_ids = _get_healthy_ref_ids()
     tumor_ref_ids = _get_tumor_ref_ids()
 
     healthy_ref_mask = adata_proc.obs_names.isin(healthy_ref_ids)
@@ -136,22 +127,25 @@ def run_classifiers_compare_and_score(
     _logistic_regression_plot_and_coeff(
         fitted_models, adata_proc, X_ref, y_ref, X_cand, random_state
     )
-    # ------------------------------------------------------------------
-    # Present tables
-    # ------------------------------------------------------------------
-    print("\n=== Cross-validated performance ===")
-    print(metrics_df.round(4).to_string())
 
     _plot_results(adata_sub, pca)
 
     slices_dir = pathlib.Path(rf"{BASE_DIR}/resources/cache/")
-    slice_paths = sorted(slices_dir.glob("slice_*_adata.h5ad"))
-    for slice_path in slice_paths:
-        print(f"\n--- Applying models to new slice: {slice_path.name} ---")
-        adata_new = ad.read_h5ad(slice_path)
-        predict_tumor_on_new_slice(adata_new, fitted_models)
-
-
+    slide_map = {"L321": [2,3], "L34": [4,5,6]}
+    for slide_id in slide_map:
+        for slice_num in slide_map[slide_id]:
+            slice_path = slices_dir / f"slice_{slice_num}_adata.h5ad"
+            if slice_path.exists():
+                print(f"\n--- Applying models to new slice: {slice_path.name} ---")
+                slice_adata = ad.read_h5ad(slice_path)
+                slice_id = slice_adata.uns[SLICE_ID]
+                annotation_path =   rf"{BASE_DIR}/outputs/cell_annotation/{slide_id}/05/{slice_num}/slice_{slice_num}_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+                if pathlib.Path(annotation_path).exists():
+                    annotation_df = pd.read_csv(annotation_path)
+                    tumor_cells = _get_tumor_candidates_ids(annotation_df)
+                    predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models)
+                else:
+                    continue
     return {
         "metrics_df": metrics_df,
         "adata_sub": adata_sub,
@@ -284,6 +278,23 @@ def _fit_models(models, X_ref, y_ref, cv, scoring):
         fitted_model.fit(X_ref, y_ref)
         fitted_models[model_name] = fitted_model
 
+        preds = (probs[:, 1] >= 0.6).astype(int)
+
+        audit_df = pd.DataFrame({
+            "true_label": y_ref,  # 1=healthy, 0=tumor
+            "oof_prob_healthy": probs[:, 1],
+            "oof_pred_label": preds,
+        })
+        audit_df["true_label_name"] = audit_df["true_label"].map({1: "Healthy Ref", 0: "Tumor Ref"})
+        audit_df["oof_pred_name"] = audit_df["oof_pred_label"].map({1: "Healthy", 0: "Tumor"})
+        audit_df["correct"] = audit_df["true_label"] == audit_df["oof_pred_label"]
+
+        n_correct_healthy = ((audit_df["true_label"] == 1) & (audit_df["oof_pred_label"] == 1)).sum()
+        n_correct_tumor = ((audit_df["true_label"] == 0) & (audit_df["oof_pred_label"] == 0)).sum()
+
+        print(f"Model {model_name} correct healthy labeling: {n_correct_healthy} out of {(y_ref == 1).sum()} healthy reference cells")
+        print(f"Model {model_name} correct tumor labeling: {n_correct_tumor} out of {(y_ref == 0).sum()} tumor reference cells")
+
     metrics_df = (
         pd.DataFrame(metrics_rows)
         .set_index("model")
@@ -326,7 +337,33 @@ def _get_fit_scores(
         final_scores[is_cand_in_sub] = fitted_model.predict_proba(X_cand_sub)[:, 1]
 
         adata_sub.obs[score_col] = final_scores
-        adata_sub.obs[pred_col] = (final_scores >= 0.5).astype(int)
+
+        plot_spatial_continuous_scores(
+            adata_sub,
+            model_names=(model_name,),
+            x_col="CenterX_global_px",
+            y_col="CenterY_global_px",
+            tumor_score=True,  # plots 1 - score_healthy
+            only_candidates=False,  # or True if you want only candidate cells colored
+            suptitle="Continuous tumor score across models"
+        )
+
+        adata_sub.obs[pred_col] = (final_scores >= 0.6).astype(int)
+
+        ref_obs = adata_sub.obs[adata_sub.obs["is_reference"]].copy()
+
+        n_healthy_as_tumor = (
+                (ref_obs["reference_label"] == 1) &
+                (ref_obs[f"pred_healthy_{model_name}"] == 0)
+        ).sum()
+
+        n_tumor_as_healthy = (
+                (ref_obs["reference_label"] == 0) &
+                (ref_obs[f"pred_healthy_{model_name}"] == 1)
+        ).sum()
+
+        print(f"Model {model_name}: Healthy refs predicted as tumor: {n_healthy_as_tumor} out of {(healthy_ref_mask.sum())} healthy reference cells")
+        print(f"Model {model_name}: Tumor refs predicted as healthy: {n_tumor_as_healthy} out of {(tumor_ref_mask.sum())} tumor reference cells")
 
         # 4. Calculate Ensemble Mean (using the stitched scores)
     model_score_cols = [f"score_healthy_{m}" for m in fitted_models.keys()]
@@ -340,11 +377,22 @@ def _get_fit_scores(
     if len(mismatches) > 0:
         mismatches["mismatch_type"] = np.where(
             mismatches["reference_label"] == 1,
-            "False Tumor (Labeled Healthy, Predicted Tumor)",
-            "False Healthy (Labeled Tumor, Predicted Healthy)"
+            "Healthy ref predicted as Tumor",
+            "Tumor ref predicted as Healthy"
         )
-        print(f"\n--- OOF Audit: Found {len(mismatches)} mismatches in {len(ref_obs)} reference cells ---")
-        print(mismatches[["classifier_group", "score_healthy_mean", "mismatch_type"]].to_string())
+        print(f"\n--- OOF Audit for pred_healthy_mean: Found {len(mismatches)} mismatches in {len(ref_obs)} reference cells ---")
+        n_healthy_as_tumor = (
+                (ref_obs["reference_label"] == 1) &
+                (ref_obs["pred_healthy_mean"] == 0)
+        ).sum()
+
+        n_tumor_as_healthy = (
+                (ref_obs["reference_label"] == 0) &
+                (ref_obs["pred_healthy_mean"] == 1)
+        ).sum()
+
+        print(f"Healthy refs predicted as tumor: {n_healthy_as_tumor}")
+        print(f"Tumor refs predicted as healthy: {n_tumor_as_healthy}")
     else:
         print("\n--- OOF Audit: No mismatches found! Reference labels are consistent. ---")
 
@@ -464,42 +512,48 @@ def _plot_results(adata_sub, pca):
         _plot_tumor_cells(healthy_cells, model_name, pca)
 
 
-def predict_tumor_on_new_slice(adata_new, fitted_models):
+def predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models):
     """
     Applies pre-trained models to a new slice.
     """
-    adata_target = adata_new.copy()
+    is_tumor_singler = slice_adata.obs_names.isin(tumor_cells)
+    adata_candidates = slice_adata[is_tumor_singler].copy()
 
     # 2. Preprocess exactly like the training set
-    sc.pp.normalize_total(adata_target, target_sum=1e4)
-    sc.pp.log1p(adata_target)
+    sc.pp.normalize_total(adata_candidates, target_sum=1e4)
+    sc.pp.log1p(adata_candidates)
 
     # Convert to dense matrix for sklearn/xgboost
-    X_target = _to_dense(adata_target.X)
+    X_target = _to_dense(adata_candidates.X)
 
     # 3. Generate Predictions
     # We use the full models here (no OOF needed for new slices)
     results = {}
-    for name, model in fitted_models.items():
-        results[f"score_healthy_{name}"] = model.predict_proba(X_target)[:, 1]
+    for classifier_name, model in fitted_models.items():
+        scores = model.predict_proba(X_target)[:, 1]
 
-    # 4. Add scores back to the ORIGINAL adata_new object
-    for col, scores in results.items():
-        adata_new.obs[col] = scores
-        # Label as healthy (1) or tumor (0) based on 0.5 threshold
-        adata_new.obs[col.replace("score", "pred")] = (scores >= 0.5).astype(int)
+        # Initialize the full adata column to 'Healthy' (1.0)
+        score_col = f"score_healthy_{classifier_name}"
+        slice_adata.obs[score_col] = 1.0
+
+        slice_adata.obs.loc[is_tumor_singler, score_col] = scores
+
+        # Labeling (1=Healthy, 0=Tumor)
+        pred_col = f"pred_healthy_{classifier_name}"
+        slice_adata.obs[pred_col] = (slice_adata.obs[score_col] >= 0.6).astype(int)
+
 
     # 5. Calculate Ensemble Mean
     score_cols = [f"score_healthy_{m}" for m in fitted_models.keys()]
-    adata_new.obs["score_healthy_mean"] = adata_new.obs[score_cols].mean(axis=1)
-    adata_new.obs["pred_healthy_mean"] = (adata_new.obs["score_healthy_mean"] >= 0.5).astype(int)
+    slice_adata.obs["score_healthy_mean"] = slice_adata.obs[score_cols].mean(axis=1)
+    slice_adata.obs["pred_healthy_mean"] = (slice_adata.obs["score_healthy_mean"] >= 0.5).astype(int)
 
-    for name, model in fitted_models.items():
-        _plot_tumor_spatial_refined(adata_new, name, adata_new.uns[SAMPLE_ID], adata_new.uns[SLICE_ID])
-    return adata_new
+    for classifier_name, model in fitted_models.items():
+        _plot_tumor_spatial_refined(slice_adata, tumor_cells, classifier_name, slice_adata.uns[SAMPLE_ID], slice_adata.uns[SLICE_ID])
+    return slice_adata
 
 
-def _plot_tumor_spatial_refined(adata, classifier_name, sample_id, slice_id):
+def _plot_tumor_spatial_refined(adata, tumor_cells, classifier_name, sample_id, slice_id):
     """
     Plots tumor cells spatially across the entire slice based on ML predictions.
     """
@@ -507,84 +561,192 @@ def _plot_tumor_spatial_refined(adata, classifier_name, sample_id, slice_id):
     plot_obs = adata.obs.copy()
 
     # Apply coordinate transformations
-    plot_obs[CENTER_Y_GLOBAL_PX] = -plot_obs[CENTER_Y_GLOBAL_PX]
-    plot_obs[CENTER_X_GLOBAL_PX] = -plot_obs[CENTER_X_GLOBAL_PX]
+    plot_obs[CENTER_Y_GLOBAL_PX] = plot_obs[CENTER_Y_GLOBAL_PX]
+    plot_obs[CENTER_X_GLOBAL_PX] = plot_obs[CENTER_X_GLOBAL_PX]
 
     # 2. Define the Global Tumor logic
     # Assuming 1 = Healthy and 0 = Tumor (your current setup)
     # If a cell is NOT predicted healthy, it's a tumor candidate.
+    is_tumor_singler = plot_obs.index.isin(tumor_cells)
     pred_col = f"pred_healthy_{classifier_name}"
     if pred_col in plot_obs.columns:
         is_tumor_ml = plot_obs[pred_col] == 0
     else:
         is_tumor_ml = plot_obs["pred_healthy_mean"] == 0
 
+    cells_rejected = is_tumor_singler & (~is_tumor_ml)
+
     # Optional: If you want to see where SingleR and ML disagree:
     # is_tumor_base = plot_obs["predicted_cell_type"] == "Tumor"
 
     # ALL cells predicted as tumor by the ML model
-    cells_to_keep = is_tumor_ml
-    is_background = ~cells_to_keep
+    cells_to_keep = is_tumor_singler & is_tumor_ml
+    is_background = ~(cells_to_keep | cells_rejected)
 
     # 3. Plotting
     plt.figure(figsize=(10, 10))
 
-    # Layer 1: Background (Predicted Healthy)
+    # Layer 1: Background
     plt.scatter(
         plot_obs.loc[is_background, CENTER_X_GLOBAL_PX],
         plot_obs.loc[is_background, CENTER_Y_GLOBAL_PX],
-        c="#CFCFCF",
-        s=0.7,
-        alpha=0.4,
-        edgecolors="none",
+        c="#E0E0E0", s=0.7, alpha=0.3, edgecolors="none"
     )
 
-    # Layer 2: Predicted Tumor Cells (Everywhere in the slice)
+    # Layer 2: Mislabeled/Rejected (Gray-Blue) - "The Noise"
+    plt.scatter(
+        plot_obs.loc[cells_rejected, CENTER_X_GLOBAL_PX],
+        plot_obs.loc[cells_rejected, CENTER_Y_GLOBAL_PX],
+        c="#607D8B", s=1.2, alpha=0.5, label="ML Rejected (Mislabeled)"
+    )
+
+    # Layer 3: Refined Tumor (Red) - "The Signal"
     plt.scatter(
         plot_obs.loc[cells_to_keep, CENTER_X_GLOBAL_PX],
         plot_obs.loc[cells_to_keep, CENTER_Y_GLOBAL_PX],
-        c="red",
-        s=1.5,
-        alpha=0.8,
-        edgecolors="none",
-        label=f"Sample {sample_id} slice {slice_id} ML Predicted Tumor"
+        c="red", s=2.0, alpha=0.9, label="Refined Tumor"
     )
 
-    # 4. Analytics for your Thesis
-    # How many NEW tumor cells did we find that SingleR missed?
-    n_total_ml = is_tumor_ml.sum()
+    n_tumor_candidates = is_tumor_singler.sum()
+    n_kept = cells_to_keep.sum()
+    n_rejected = cells_rejected.sum()
 
     plt.title(
-        f"Sample {sample_id} slice {slice_id} Global Spatial Mapping: {classifier_name}\n"
-        f"Total ML Tumor: {n_total_ml}",
+        f"Sample {sample_id} Slice {slice_id} | Refinement: {classifier_name}\n"
+        f"Refined: {n_tumor_candidates} | Rejected Mislabeled: {n_rejected}| Tumor Cells Left: {n_kept}",
         fontsize=14
     )
     plt.axis("equal")
     plt.axis("off")
-    plt.legend(loc="upper right", markerscale=5)
+    plt.legend(loc="upper right", markerscale=4)
+    plt.show()
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def plot_spatial_continuous_scores(
+    adata,
+    model_names=("logistic_regression", "random_forest", "xgboost"),
+    x_col="CenterX_global_px",
+    y_col="CenterY_global_px",
+    point_size_bg=1,
+    point_size_score=6,
+    alpha_bg=0.15,
+    alpha_score=0.9,
+    cmap="Reds",
+    flip_y=True,
+    figsize_per_panel=(6, 6),
+    tumor_score=True,
+    vmin=0.0,
+    vmax=1.0,
+    only_candidates=False,
+    candidate_col="classifier_group",
+    candidate_value="Tumor Candidate",
+    suptitle=None,
+):
+    """
+    Plot continuous spatial scores for each model.
+
+    Parameters
+    ----------
+    adata : AnnData
+    model_names : tuple/list
+        Model names matching obs columns score_healthy_<model>
+    x_col, y_col : str
+        Spatial coordinate columns in adata.obs
+    tumor_score : bool
+        If True, plot 1 - score_healthy_<model>
+        If False, plot score_healthy_<model>
+    only_candidates : bool
+        If True, plot scores only for candidate cells
+    """
+
+    x = adata.obs[x_col].values
+    y = adata.obs[y_col].values
+
+    if flip_y:
+        y_plot = -y
+    else:
+        y_plot = y
+
+    if only_candidates:
+        mask = adata.obs[candidate_col] == candidate_value
+    else:
+        mask = np.ones(adata.n_obs, dtype=bool)
+
+    n_models = len(model_names)
+    fig, axes = plt.subplots(1, n_models, figsize=(figsize_per_panel[0] * n_models, figsize_per_panel[1]))
+
+    if n_models == 1:
+        axes = [axes]
+
+    for ax, model_name in zip(axes, model_names):
+        score_col = f"score_healthy_{model_name}"
+        if score_col not in adata.obs.columns:
+            raise ValueError(f"{score_col} not found in adata.obs")
+
+        healthy_score = adata.obs[score_col].values
+        score = 1 - healthy_score if tumor_score else healthy_score
+
+        # background: all cells
+        ax.scatter(
+            x, y_plot,
+            s=point_size_bg,
+            c="lightgrey",
+            alpha=alpha_bg,
+            linewidths=0,
+            rasterized=True
+        )
+
+        # overlay: selected cells with continuous score
+        sc = ax.scatter(
+            x[mask], y_plot[mask],
+            s=point_size_score,
+            c=score[mask],
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            alpha=alpha_score,
+            linewidths=0,
+            rasterized=True
+        )
+
+        label = "Tumor score" if tumor_score else "Healthy score"
+        ax.set_title(f"{model_name}\n{label}", fontsize=12)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_aspect("equal")
+
+        cbar = plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label(label)
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=14)
+
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
-    print("=== Running classifiers with healthy refs from the same slice with PCA ===")
-    run_classifiers_compare_and_score(
-        adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
-        healthy_refs_same_slice=True,
-        pca = True
-    )
-    print("\n\n=== Running classifiers with healthy refs from control slice with PCA ===")
-    run_classifiers_compare_and_score(
-        adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
-        healthy_refs_same_slice=False,
-        pca=True
-
-    )
-    print("=== Running classifiers with healthy refs from the same slice NO PCA ===")
-    run_classifiers_compare_and_score(
-        adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
-        healthy_refs_same_slice=True,
-    )
+    # print("=== Running classifiers with healthy refs from the same slice with PCA ===")
+    # run_classifiers_compare_and_score(
+    #     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
+    #     healthy_refs_same_slice=True,
+    #     pca = True
+    # )
+    # print("\n\n=== Running classifiers with healthy refs from control slice with PCA ===")
+    # run_classifiers_compare_and_score(
+    #     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
+    #     healthy_refs_same_slice=False,
+    #     pca=True
+    #
+    # )
+    # print("=== Running classifiers with healthy refs from the same slice NO PCA ===")
+    # run_classifiers_compare_and_score(
+    #     adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
+    #     healthy_refs_same_slice=True,
+    # )
     print("\n\n=== Running classifiers with healthy refs from control slice NO PCA ===")
     run_classifiers_compare_and_score(
         adata=ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_L321_adata.h5ad"),
-        healthy_refs_same_slice=False,
     )
