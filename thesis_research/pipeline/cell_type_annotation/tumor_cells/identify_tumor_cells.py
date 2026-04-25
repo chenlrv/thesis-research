@@ -14,7 +14,7 @@ from sklearn.model_selection import StratifiedKFold, cross_validate, cross_val_p
 from scipy.sparse import issparse
 from scipy.stats import ttest_ind
 from statsmodels.stats.multitest import multipletests
-
+from scipy.stats import mannwhitneyu
 from thesis_research.utils.columns import CENTER_Y_GLOBAL_PX, CENTER_X_GLOBAL_PX
 
 BASE_DIR = r"D:/thesis-research/"
@@ -676,10 +676,18 @@ def _de_one_slide(slide_id, min_cells=5):
     log2fc = np.full(n_genes, np.nan)
     for i in range(n_genes):
         h, t = X_h[:, i], X_t[:, i]
-        if (h > 0).sum() < min_cells or (t > 0).sum() < min_cells:
+        # require detection in EITHER group (not both)
+        if (h > 0).sum() < min_cells and (t > 0).sum() < min_cells:
             continue
-        log2fc[i] = np.mean(t) - np.mean(h)
-        _, pvals[i] = ttest_ind(t, h, equal_var=False)
+        # proper log2FC on linear scale
+        mean_h = np.expm1(h).mean()
+        mean_t = np.expm1(t).mean()
+        log2fc[i] = np.log2((mean_t + 1) / (mean_h + 1))
+        # non-parametric test
+        try:
+            _, pvals[i] = mannwhitneyu(t, h, alternative='two-sided')
+        except ValueError:
+            pvals[i] = 1.0  # all-equal case
 
     tested = ~np.isnan(pvals)
     padj = np.full(n_genes, np.nan)
@@ -765,8 +773,8 @@ def plot_volcano(slide_ids=("L321", "L34"), min_cells=5, fc_thresh=1.0, fdr_thre
         fc_thresh, fdr_thresh, genes, top_idx,
     )
 
-    plt.suptitle("Tumor vs Healthy Reference Cells", fontsize=14, y=1.01)
-    plt.tight_layout()
+    plt.suptitle("Tumor vs Healthy Reference Cells", fontsize=14, y=0.98)
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
 
     return pd.DataFrame({
@@ -778,6 +786,55 @@ def plot_volcano(slide_ids=("L321", "L34"), min_cells=5, fc_thresh=1.0, fdr_thre
     }, index=common_genes)
 
 
+def _get_volcano_genes(result_df):
+    result_df = result_df.copy()
+    result_df["mean_log2fc"] = (result_df["log2fc_L321"] + result_df["log2fc_L34"]) / 2
+    result_df["max_padj"] = np.fmax(result_df["padj_L321"].fillna(1),
+                                    result_df["padj_L34"].fillna(1))
+
+    # Combined score: significance × magnitude
+    result_df["score"] = result_df["mean_log2fc"].abs() * -np.log10(result_df["max_padj"] + 1e-300)
+
+    # Filter to concordant hits and sort
+    ranked = (result_df[result_df["concordant"]]
+              .sort_values("score", ascending=False))
+
+    # Just the gene names, ordered
+    gene_list = ranked.index.tolist()
+    print(gene_list)
+
+def _get_per_slide_genes(result_df):
+    fc_thresh, fdr_thresh = 1.0, 0.05
+
+    # Per-slide significance
+    sig_L321 = (result_df["padj_L321"] < fdr_thresh) & (result_df["log2fc_L321"].abs() > fc_thresh)
+    sig_L34 = (result_df["padj_L34"] < fdr_thresh) & (result_df["log2fc_L34"].abs() > fc_thresh)
+
+    # Slide-specific = significant in this slide but NOT concordant across both
+    specific_L321 = result_df[sig_L321 & ~result_df["concordant"]]
+    specific_L34 = result_df[sig_L34 & ~result_df["concordant"]]
+
+    # Concordant (for comparison)
+    concordant = result_df[result_df["concordant"]]
+
+    print(f"L321-specific: {len(specific_L321)} genes")
+    print(f"L34-specific:  {len(specific_L34)} genes")
+    print(f"Concordant:    {len(concordant)} genes")
+    l321_specific_genes = (specific_L321
+                           .sort_values("padj_L321")
+                           .index.tolist())
+
+    l34_specific_genes = (specific_L34
+                          .sort_values("padj_L34")
+                          .index.tolist())
+
+    print("L321-specific:", l321_specific_genes)
+    print("L34-specific:", l34_specific_genes)
+
+
+
 if __name__ == "__main__":
-    plot_volcano()
+    result_df = plot_volcano()
+    _get_volcano_genes(result_df)
+    _get_per_slide_genes(result_df)
     run_identify_tumor_cells_joint()
