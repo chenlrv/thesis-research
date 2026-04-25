@@ -1273,5 +1273,45 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_
     return {"comp_df": comp_df, "counts_df": counts_df}
 
 
+def _get_nuclear_cell_ratio():
+    slide_ids = ["L321", "L34"]
+
+    for slide_id in slide_ids:
+        healthy_ids = _get_healthy_ref_ids(slide_id)
+        tumor_ids = _get_tumor_ref_ids(slide_id)
+        df = pd.read_csv(rf"D:/thesis-research/resources/cosmx/{slide_id}/{slide_id}_metadata_file.csv")
+        df["global_cell_id"] = df["cell"].apply(lambda x: f"{x}_{slide_id}")
+
+        healthy_df = df[df["global_cell_id"].isin(healthy_ids)].copy()
+        tumor_df = df[df["global_cell_id"].isin(tumor_ids)].copy()
+
+        healthy_df['NC_ratio'] = healthy_df['NucArea'] / (healthy_df['Area'] - healthy_df['NucArea'])
+        tumor_df['NC_ratio'] = tumor_df['NucArea'] / (tumor_df['Area'] - tumor_df['NucArea'])
+
+        # Add labels and combine
+        healthy_df['condition'] = 'Healthy'
+        tumor_df['condition'] = 'Tumor'
+        combined = pd.concat([healthy_df, tumor_df], ignore_index=True)
+
+        # --- Optional: filter outliers (bad segmentation) ---
+        combined = combined[combined['NC_ratio'] < combined['NC_ratio'].quantile(0.99)]
+        combined = combined[combined['NC_ratio'] > 0]
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        for cond, color in zip(['Healthy', 'Tumor'], ['steelblue', 'tomato']):
+            subset = combined[combined['condition'] == cond]
+            subset['NC_ratio'].plot.kde(ax=ax, label=f"{cond} (n={len(subset):,})", color=color)
+
+        ax.set_title(f'Nucleai:Cell Area Ratio Distribution — Slide {slide_id}')
+        ax.set_xlim(left=0)
+        ax.set_xlabel('Nucleai:Cell Area Ratio')
+        ax.set_ylabel('Density')
+        ax.legend()
+        plt.tight_layout()
+        # plt.savefig(rf"D:/thesis-research/resources/cosmx/{slide_id}/{slide_id}_NC_ratio_kde.png", dpi=150)
+        plt.show()
+
+
 if __name__ == "__main__":
+    _get_nuclear_cell_ratio()
     run_model_comparison()
