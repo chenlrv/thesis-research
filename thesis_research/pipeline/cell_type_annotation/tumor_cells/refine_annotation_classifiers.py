@@ -27,7 +27,7 @@ from thesis_research.utils.columns import CENTER_X_GLOBAL_PX, CENTER_Y_GLOBAL_PX
 
 BASE_DIR = r"D:/thesis-research/"
 
-PRED_HEALTHY_THRESHOLD = 0.7
+PRED_HEALTHY_THRESHOLD = 0.75
 
 def train_classifiers(adata, sample_id, pca=False, n_splits=5, random_state=42):
     """
@@ -884,7 +884,87 @@ def run_classifiers_joint(pca=False, n_splits=5, random_state=42):
     }
 
 
-def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.7, n_pcs=50):
+def _plot_threshold_calibration(y_true, oof_prob, current_thresh=0.7):
+    """
+    Two-panel threshold calibration plot for a binary OOF probability vector.
+
+    Left panel:  Precision-Recall curve with the operating point marked.
+    Right panel: Precision, Recall, and F1 as a function of threshold,
+                 with the current threshold and the max-F1 threshold marked.
+
+    y_true : 1=healthy, 0=tumor  (as used throughout this file)
+    oof_prob : P(healthy) from OOF cross-validation
+    """
+    from sklearn.metrics import precision_recall_curve
+
+    # sklearn's precision_recall_curve treats the *higher* score as the positive class.
+    # Here 1=healthy is "positive", so oof_prob (P(healthy)) is already correct.
+    precision, recall, thresholds = precision_recall_curve(y_true, oof_prob)
+    # thresholds has length n-1; precision/recall have length n (last element is trivial)
+    pr_thresh = thresholds          # shape (n-1,)
+    pr_prec   = precision[:-1]
+    pr_rec    = recall[:-1]
+    f1_vals   = np.where(
+        (pr_prec + pr_rec) > 0,
+        2 * pr_prec * pr_rec / (pr_prec + pr_rec),
+        0.0,
+    )
+
+    best_idx   = int(np.argmax(f1_vals))
+    best_thresh = float(pr_thresh[best_idx])
+    best_f1     = float(f1_vals[best_idx])
+
+    # Index closest to current operating threshold
+    op_idx = int(np.argmin(np.abs(pr_thresh - current_thresh)))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle("LogReg + PCA — Threshold Calibration (OOF)", fontsize=13, fontweight="bold")
+
+    # ── Left: Precision-Recall curve ────────────────────────────────────────
+    ax1.plot(pr_rec, pr_prec, color="steelblue", linewidth=2, label="PR curve")
+    ax1.scatter(
+        pr_rec[op_idx], pr_prec[op_idx],
+        c="red", s=120, zorder=5, label=f"threshold={current_thresh} (operating)"
+    )
+    ax1.scatter(
+        pr_rec[best_idx], pr_prec[best_idx],
+        c="green", s=120, marker="*", zorder=5,
+        label=f"best F1 threshold={best_thresh:.2f} (F1={best_f1:.3f})"
+    )
+    ax1.set_xlabel("Recall (healthy)")
+    ax1.set_ylabel("Precision (healthy)")
+    ax1.set_title("Precision-Recall Curve")
+    ax1.legend(fontsize=9)
+    ax1.grid(True, linestyle="--", alpha=0.4)
+
+    # ── Right: Precision / Recall / F1 vs threshold ──────────────────────────
+    ax2.plot(pr_thresh, pr_prec, label="Precision", color="dodgerblue")
+    ax2.plot(pr_thresh, pr_rec,  label="Recall",    color="tomato")
+    ax2.plot(pr_thresh, f1_vals, label="F1",        color="seagreen", linewidth=2)
+    ax2.axvline(current_thresh, color="red",   linestyle="--", linewidth=1.5,
+                label=f"operating threshold={current_thresh}")
+    ax2.axvline(best_thresh,    color="green", linestyle="--", linewidth=1.5,
+                label=f"best F1 threshold={best_thresh:.2f}")
+    ax2.set_xlabel("Threshold (P(healthy))")
+    ax2.set_ylabel("Score")
+    ax2.set_title("Precision / Recall / F1 vs Threshold")
+    ax2.legend(fontsize=9)
+    ax2.grid(True, linestyle="--", alpha=0.4)
+
+    print(f"\n=== LogReg+PCA Threshold Calibration ===")
+    print(f"  Operating threshold : {current_thresh:.2f}  ->  "
+          f"precision={pr_prec[op_idx]:.4f}  recall={pr_rec[op_idx]:.4f}  F1={f1_vals[op_idx]:.4f}")
+    print(f"  Best-F1 threshold   : {best_thresh:.2f}  ->  "
+          f"precision={pr_prec[best_idx]:.4f}  recall={pr_rec[best_idx]:.4f}  F1={best_f1:.4f}")
+
+    plt.tight_layout()
+    out_path = pathlib.Path(BASE_DIR) / "resources" / "cache" / "threshold_calibration.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    print(f"  Calibration plot saved to: {out_path}")
+    plt.show()
+
+
+def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_pcs=50):
     """
     Compares 4 tumor classifiers on the joint L321+L34 reference pool:
       1. LogReg             - StandardScaler + LogisticRegression (full gene space)
@@ -902,6 +982,7 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.7, n_p
     from sklearn.metrics import (
         accuracy_score, precision_score, recall_score, f1_score,
         roc_auc_score, average_precision_score,
+        precision_recall_curve, roc_curve,
     )
 
     slide_ids = ["L321", "L34"]
@@ -1065,6 +1146,9 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.7, n_p
     ax.grid(axis="y", linestyle="--", alpha=0.5)
     plt.tight_layout()
     plt.show()
+
+    # ── 8b. Threshold calibration plot (LogReg + PCA, OOF) ──────────────────
+    _plot_threshold_calibration(y_ref, oof_logreg_pca, prob_thresh)
 
     # ── 9. Score candidates + spatial comparison ─────────────────────────────
     model_labels = ["LogReg", "LogReg+PCA", "LogReg+KNN (PCA)", "XGBoost"]

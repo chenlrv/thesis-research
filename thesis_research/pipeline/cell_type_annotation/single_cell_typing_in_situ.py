@@ -3,6 +3,110 @@ import matplotlib.pyplot as plt
 import anndata as ad
 import re
 import numpy as np
+
+import matplotlib.pyplot as plt
+import scanpy as sc
+import pandas as pd
+import numpy as np
+
+
+def plot_insitu_clusters(adata, cluster_key='RNA_Basic.run_Cell.Typing.InSituType.1_1_clusters'):
+    # 1. Setup Coordinates (Matching your inversion logic)
+    # Note: Using .copy() if you don't want to permanently flip the adata
+    x_coords = -adata.obs["CenterX_global_px"]
+    y_coords = -adata.obs["CenterY_global_px"]
+    adata = adata.copy()
+
+    # 2. Identify Background vs Clusters
+    # Anything NaN or not in a cluster is treated as background
+    is_background = adata.obs[cluster_key].isna()
+    clusters = adata.obs[cluster_key].dropna().unique()
+
+    plt.figure(figsize=(12, 12))
+
+    # LAYER 1: Background (All non-clustered cells)
+    plt.scatter(
+        x_coords[is_background],
+        y_coords[is_background],
+        c="#E0E0E0",  # Light grey
+        s=0.5,  # Tiny dots
+        alpha=0.5,
+        edgecolors="none",
+        label="Background"
+    )
+
+    # LAYER 2: Clusters (Iterate to color each)
+    # We use a colormap to handle multiple cluster IDs automatically
+    colors = plt.cm.get_cmap('tab20', len(clusters))
+
+    for i, cluster_id in enumerate(clusters):
+        mask = adata.obs[cluster_key] == cluster_id
+        plt.scatter(
+            x_coords[mask],
+            y_coords[mask],
+            c=[colors(i)],
+            s=1.2,  # Slightly larger to pop
+            alpha=0.9,
+            edgecolors="none",
+            label=f"Cluster {cluster_id}"
+        )
+
+    plt.title(f"InSituType Clusters", fontsize=15)
+    plt.axis("equal")
+    plt.axis("off")
+
+    # Adjust legend to be readable if there are many clusters
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', markerscale=4)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_insitu_cluster_f(adata, cluster_key='RNA_Basic.run_Cell.Typing.InSituType.1_1_clusters'):
+    x_coords = -adata.obs["CenterX_global_px"]
+    y_coords = -adata.obs["CenterY_global_px"]
+
+    # 1. Redefine Background: Include NaNs AND any cell NOT in cluster 'f'
+    # This ensures everything else is plotted in grey first
+    is_f = adata.obs[cluster_key] == 'f'
+    is_background = ~is_f
+
+    plt.figure(figsize=(12, 12))
+
+    colors = plt.cm.get_cmap('tab20', 20)
+
+    # LAYER 1: Background (Everything except Cluster f)
+    plt.scatter(
+        x_coords[is_background],
+        y_coords[is_background],
+        c="#CFCFCF",
+        s=0.7,
+        alpha=1,  # Lower alpha for better contrast
+        edgecolors="none",
+        label="Background"
+    )
+
+    # LAYER 2: Cluster 'f' (The foreground)
+    plt.scatter(
+        x_coords[is_f],
+        y_coords[is_f],
+        c=[colors(ord('j')-ord('a') + 1)],  # Matching your image's color
+        s=1.5,  # Slightly larger to pop
+        alpha=1.0,
+        edgecolors="none",
+        label="Cluster f"
+    )
+
+    plt.title(f"InSituType Cluster Suspected Tumor", fontsize=15)
+    plt.axis("equal")
+    plt.axis("off")
+    plt.legend(bbox_to_anchor=(1, 1), loc='upper left', markerscale=4)
+    plt.tight_layout()
+    plt.show()
+
+
+# Usage:
+# plot_insitu_clusters(adata)
+
 def _many_distinct_colors(n: int, seed: int = 0):
     """
     Return n distinct RGBA colors.
@@ -10,12 +114,14 @@ def _many_distinct_colors(n: int, seed: int = 0):
     """
     try:
         import colorcet as cc  # pip install colorcet
+
         return np.array(cc.glasbey[:n])
     except Exception:
         rng = np.random.default_rng(seed)
         hues = np.linspace(0, 1, n, endpoint=False)
         rng.shuffle(hues)  # prevents similar neighbors
         return plt.cm.hsv(hues)
+
 
 def to_coarse_cell_type(ct: str) -> str:
     if pd.isna(ct):
@@ -40,7 +146,10 @@ def to_coarse_cell_type(ct: str) -> str:
 
     if re.search(r"\boligodendrocyte precursor\b|\bopc\b", s):
         return "OPC"
-    if re.search(r"\boligodendrocyte\b|myelin-forming|newly-formed|committed oligodendrocytes|mature oligodendrocytes", s):
+    if re.search(
+        r"\boligodendrocyte\b|myelin-forming|newly-formed|committed oligodendrocytes|mature oligodendrocytes",
+        s,
+    ):
         return "Oligodendrocytes"
 
     # lining / barrier
@@ -58,7 +167,10 @@ def to_coarse_cell_type(ct: str) -> str:
     # neurons
     if re.search(r"\bexcitatory neurons?\b", s):
         return "Excitatory Neurons"
-    if re.search(r"\binhibitory neurons?\b|\bmedium spiny neurons?\b|\binterneurons?\b|\bneurogliaform\b|\bcck interneurons\b", s):
+    if re.search(
+        r"\binhibitory neurons?\b|\bmedium spiny neurons?\b|\binterneurons?\b|\bneurogliaform\b|\bcck interneurons\b",
+        s,
+    ):
         return "Inhibitory Neurons"
 
     # modulatory neurons
@@ -74,13 +186,25 @@ def to_coarse_cell_type(ct: str) -> str:
 
 CELLTYPE_GROUPS = {
     "Group 1 (Astro/Ependymal/Innate/Vascular/Neuroblasts)": [
-        "Astrocytes", "Ependymal", "Macrophages", "Microglia", "Vascular", "Neuroblasts"
+        "Astrocytes",
+        "Ependymal",
+        "Macrophages",
+        "Microglia",
+        "Vascular",
+        "Neuroblasts",
     ],
     "Group 2 (Oligo lineage / T cells / Choroid plexus)": [
-        "OPC", "Oligodendrocytes", "Tcells", "Choroid Plexus"
+        "OPC",
+        "Oligodendrocytes",
+        "Tcells",
+        "Choroid Plexus",
     ],
     "Group 3 (Neuronal / Cajal-Retzius / Cerebellar / Modulatory)": [
-        "CajalRetzius", "Cerebellar", "Excitatory Neurons", "Inhibitory Neurons", "Modulatory"
+        "CajalRetzius",
+        "Cerebellar",
+        "Excitatory Neurons",
+        "Inhibitory Neurons",
+        "Modulatory",
     ],
 }
 
@@ -135,7 +259,7 @@ def plot_celltypes_groups_per_sample(
             c=colors,
             alpha=alpha,
             linewidths=0,
-            rasterized=True
+            rasterized=True,
         )
 
         if invert_y:
@@ -148,8 +272,9 @@ def plot_celltypes_groups_per_sample(
 
         # legend (only for types present)
         handles = [
-            plt.Line2D([0], [0], marker="o", linestyle="", markersize=6,
-                       color=cat2color[c], label=c)
+            plt.Line2D(
+                [0], [0], marker="o", linestyle="", markersize=6, color=cat2color[c], label=c
+            )
             for c in cats
         ]
         ax.legend(handles=handles, bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False)
@@ -179,10 +304,8 @@ def add_celltype_to_adata(
         adata.obs.index.name = "obs_index"
 
     adata.obs = adata.obs.merge(
-        ann2,
-        how='left',
-        left_on='cell_global_id',
-        right_on='cell_global_id')
+        ann2, how="left", left_on="cell_global_id", right_on="cell_global_id"
+    )
 
     return adata
 
@@ -212,7 +335,14 @@ def plot_celltypes_per_sample(
     colors = sub.obs[color_col].astype(str).map(cat2color).to_numpy()
 
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-    ax.scatter(sub.obs[x_key].to_numpy(), sub.obs[y_key].to_numpy(), s=s, c=colors, alpha=alpha, linewidths=0)
+    ax.scatter(
+        sub.obs[x_key].to_numpy(),
+        sub.obs[y_key].to_numpy(),
+        s=s,
+        c=colors,
+        alpha=alpha,
+        linewidths=0,
+    )
 
     if invert_y:
         ax.invert_yaxis()
@@ -236,6 +366,10 @@ def plot_celltypes_per_sample(
         plt.close(fig)
     else:
         plt.show()
+
+
+adata = ad.read_h5ad(r'D:\\thesis-research\\resources\\cache\\slice_1_adata.h5ad')
+plot_insitu_cluster_f(adata)
 
 
 # ---------- usage ----------
