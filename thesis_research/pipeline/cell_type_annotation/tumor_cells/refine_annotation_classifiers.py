@@ -1302,9 +1302,9 @@ def _get_nuclear_cell_ratio():
             subset = combined[combined['condition'] == cond]
             subset['NC_ratio'].plot.kde(ax=ax, label=f"{cond} (n={len(subset):,})", color=color)
 
-        ax.set_title(f'Nucleai:Cell Area Ratio Distribution — Slide {slide_id}')
+        ax.set_title(f'Nucleus:Cell Area Ratio Distribution — Slide {slide_id}')
         ax.set_xlim(left=0)
-        ax.set_xlabel('Nucleai:Cell Area Ratio')
+        ax.set_xlabel('Nucleus:Cell Area Ratio')
         ax.set_ylabel('Density')
         ax.legend()
         plt.tight_layout()

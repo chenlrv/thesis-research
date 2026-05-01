@@ -448,7 +448,7 @@ def _get_tumor_ref_ids(slide_id):
 
     df_results = df_results[
         (df_results["predicted_cell_type"] == "Tumor")
-        & (df_results["score_tumor"] >= 0.5)
+        & (df_results["score_tumor"] >= 0.4)
         & (df_results["delta_score"] > 0.08)
         & (df_results["score_tumor"] > df_results["next_best_score"])
     ]
@@ -832,8 +832,51 @@ def _get_per_slide_genes(result_df):
     print("L34-specific:", l34_specific_genes)
 
 
+def _plot_ref_cells_spatial(slide_id):
+    adata = ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_{slide_id}_adata.h5ad")
+
+    healthy_ids = _get_healthy_ref_ids(slide_id)
+    tumor_ids   = _get_tumor_ref_ids(slide_id)
+
+    healthy_mask = np.asarray(adata.obs_names.isin(healthy_ids))
+    tumor_mask   = np.asarray(adata.obs_names.isin(tumor_ids))
+    background   = ~(healthy_mask | tumor_mask)
+
+    obs = adata.obs
+    plt.figure(figsize=(12, 12))
+
+    # Background — all other cells
+    plt.scatter(
+        obs.loc[background, CENTER_X_GLOBAL_PX],
+        obs.loc[background, CENTER_Y_GLOBAL_PX],
+        c="#D9D9D9", s=0.5, alpha=0.3, edgecolors="none",
+    )
+    # Healthy reference cells
+    plt.scatter(
+        obs.loc[healthy_mask, CENTER_X_GLOBAL_PX],
+        obs.loc[healthy_mask, CENTER_Y_GLOBAL_PX],
+        c="dodgerblue", s=4, alpha=0.9, edgecolors="none",
+        label=f"Healthy ref ({healthy_mask.sum()})",
+    )
+    # Tumor reference cells
+    plt.scatter(
+        obs.loc[tumor_mask, CENTER_X_GLOBAL_PX],
+        obs.loc[tumor_mask, CENTER_Y_GLOBAL_PX],
+        c="firebrick", s=4, alpha=0.9, edgecolors="none",
+        label=f"Tumor ref ({tumor_mask.sum()})",
+    )
+
+    plt.title(f"{slide_id} — Healthy vs Tumor Reference Cells (spatial)", fontsize=14)
+    plt.axis("equal")
+    plt.axis("off")
+    plt.legend(markerscale=4, frameon=False)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
+    _plot_ref_cells_spatial("L321")
+    _plot_ref_cells_spatial("L34")
     result_df = plot_volcano()
     _get_volcano_genes(result_df)
     _get_per_slide_genes(result_df)
