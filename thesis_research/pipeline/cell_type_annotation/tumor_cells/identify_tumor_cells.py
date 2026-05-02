@@ -446,9 +446,13 @@ def _get_tumor_ref_ids(slide_id):
     )
     df_results["delta_score"] = abs(df_results["score_tumor"] - df_results["next_best_score"])
 
+    if slide_id == "L321":
+        SCORE_TUMOR = 0.45
+    else:
+        SCORE_TUMOR = 0.4
     df_results = df_results[
         (df_results["predicted_cell_type"] == "Tumor")
-        & (df_results["score_tumor"] >= 0.4)
+        & (df_results["score_tumor"] >= SCORE_TUMOR)
         & (df_results["delta_score"] > 0.08)
         & (df_results["score_tumor"] > df_results["next_best_score"])
     ]
