@@ -175,27 +175,29 @@ def show_zarr_binary(
         if ann:
             lut[cidx] = 2  # tumor → red
 
+    # Bake colors directly into RGBA arrays — bypasses napari color dict entirely
+    grey_px = np.array([128, 128, 128, 128], dtype=np.uint8)
+    red_px  = np.array([255,   0,   0, 230], dtype=np.uint8)
+
     print("Remapping zarr levels…")
-    binary_pyramid = []
+    rgba_pyramid = []
     for i in range(n_levels):
         level = np.asarray(store[str(i)])
-        binary_pyramid.append(lut[np.clip(level, 0, max_label)][::-1])
-
-    color_dict = {
-        0: (0.0, 0.0, 0.0, 0.0),   # background  → transparent
-        1: (0.5, 0.5, 0.5, 0.5),   # non-tumor   → gray
-        2: (1.0, 0.0, 0.0, 0.9),   # tumor       → red
-    }
+        binary = lut[np.clip(level, 0, max_label)]  # 0=bg, 1=gray, 2=red
+        H, W = binary.shape
+        rgba = np.zeros((H, W, 4), dtype=np.uint8)
+        rgba[binary == 1] = grey_px
+        rgba[binary == 2] = red_px
+        rgba_pyramid.append(rgba[::-1])  # flip vertically
 
     # ── Open napari ─────────────────────────────────────────────────────────
     v = napari.Viewer(title=f"Tumor Map — {bool_col}")
-    layer = v.add_labels(
-        binary_pyramid,
+    layer = v.add_image(
+        rgba_pyramid,
         multiscale=True,
         name=bool_col,
-        opacity=opacity,
+        rgb=True,
     )
-    layer.color = color_dict
 
     napari.run()
     return v
