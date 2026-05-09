@@ -35,7 +35,7 @@ TUMOR_COL = "pred_tumor_XGBoost"
 # Raster resolution: longest canvas side in pixels.
 # Higher = more detail at max zoom, more RAM during --prepare (4 bytes × H × W).
 #   10 000 px → ~400 MB  |  15 000 px → ~900 MB
-MAX_PIXELS = 20_000
+MAX_PIXELS = 25_000
 
 # ── Resource paths (edit only if your layout differs) ─────────────────────────
 COSMX_DIR  = Path(r"D:\thesis-research\resources\cosmx")
@@ -96,7 +96,7 @@ def prepare(sample: str, slice_id: int) -> None:
     )
 
 
-def view_tumor(sample: str, slice_id: int) -> None:
+def view_tumor(sample: str, slice_id: int, borders: bool = True) -> None:
     import anndata as ad
     from thesis_research.viewer_tool.zarr_viewer import show_zarr_binary
 
@@ -124,6 +124,7 @@ def view_tumor(sample: str, slice_id: int) -> None:
         cell_index_path=index_p,
         adata=adata,
         bool_col=TUMOR_COL,
+        borders=borders,
     )
 
 
@@ -169,6 +170,11 @@ if __name__ == "__main__":
         help="Open tumor viewer: red = XGBoost tumor cells, gray = everything else.",
     )
     parser.add_argument(
+        "--no-borders",
+        action="store_true",
+        help="Hide cell borders in the tumor viewer (faster, cleaner at low zoom).",
+    )
+    parser.add_argument(
         "--sample", default=SAMPLE,
         help=f"Sample ID (default: {SAMPLE})",
     )
@@ -181,6 +187,6 @@ if __name__ == "__main__":
     if args.prepare:
         prepare(args.sample, args.slice_id)
     elif args.tumor:
-        view_tumor(args.sample, args.slice_id)
+        view_tumor(args.sample, args.slice_id, borders=not args.no_borders)
     else:
         view(args.sample, args.slice_id)

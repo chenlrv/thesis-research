@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import zarr
 from matplotlib.colors import to_rgba
+from skimage.segmentation import find_boundaries
 
 
 _GREY = np.array([0.5, 0.5, 0.5, 0.7], dtype=np.float32)
@@ -43,7 +44,7 @@ def show_zarr_slice(
     store = zarr.open_group(str(zarr_path), mode="r")
     n_levels = sum(1 for k in store.keys() if k.isdigit())
     # napari expects multiscale list ordered finest → coarsest; flip vertically
-    pyramid = [store[str(i)][::-1] for i in range(n_levels)]
+    pyramid = [np.asarray(store[str(i)])[::-1] for i in range(n_levels)]
     base_shape = pyramid[0].shape
     print(f"Zarr: {n_levels} levels, base {base_shape[0]}×{base_shape[1]} px")
 
@@ -116,6 +117,7 @@ def show_zarr_binary(
     adata: ad.AnnData,
     bool_col: str = "pred_tumor_XGBoost",
     opacity: float = 0.85,
+    borders: bool = True,
 ) -> napari.Viewer:
     """
     Open a multi-scale zarr label store in napari with a binary coloring:
@@ -180,14 +182,18 @@ def show_zarr_binary(
     red_px  = np.array([255,   0,   0, 230], dtype=np.uint8)
 
     print("Remapping zarr levels…")
+    border_px = np.array([20, 20, 20, 200], dtype=np.uint8)  # dark border
+
     rgba_pyramid = []
     for i in range(n_levels):
-        level = np.asarray(store[str(i)])
+        level = np.asarray(store[str(i)])           # int32, unique cell indices
         binary = lut[np.clip(level, 0, max_label)]  # 0=bg, 1=gray, 2=red
         H, W = binary.shape
         rgba = np.zeros((H, W, 4), dtype=np.uint8)
         rgba[binary == 1] = grey_px
         rgba[binary == 2] = red_px
+        if borders:
+            rgba[find_boundaries(level, mode="inner")] = border_px
         rgba_pyramid.append(rgba[::-1])  # flip vertically
 
     # ── Open napari ─────────────────────────────────────────────────────────
