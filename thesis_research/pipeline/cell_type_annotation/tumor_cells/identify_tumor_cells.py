@@ -447,7 +447,7 @@ def _get_tumor_ref_ids(slide_id):
     df_results["delta_score"] = abs(df_results["score_tumor"] - df_results["next_best_score"])
 
     if slide_id == "L321":
-        SCORE_TUMOR = 0.45
+        SCORE_TUMOR = 0.4
     else:
         SCORE_TUMOR = 0.4
     df_results = df_results[

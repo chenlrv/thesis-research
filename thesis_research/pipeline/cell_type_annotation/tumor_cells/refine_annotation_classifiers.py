@@ -1,10 +1,12 @@
-import numpy as np
 import pandas as pd
 import scanpy as sc
-import matplotlib.pyplot as plt
 import seaborn as sns
 import pathlib
-
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, average_precision_score
+)
 from scipy.sparse import issparse
 from sklearn.base import clone
 from sklearn.decomposition import PCA
@@ -27,7 +29,7 @@ from thesis_research.utils.columns import CENTER_X_GLOBAL_PX, CENTER_Y_GLOBAL_PX
 
 BASE_DIR = r"D:/thesis-research/"
 
-PRED_HEALTHY_THRESHOLD = 0.75
+PRED_HEALTHY_THRESHOLD = 0.5
 
 def train_classifiers(adata, sample_id, pca=False, n_splits=5, random_state=42):
     """
@@ -68,7 +70,6 @@ def train_classifiers(adata, sample_id, pca=False, n_splits=5, random_state=42):
     print(metrics_df.round(4).to_string())
 
     return fitted_models, metrics_df, oof_probs
-
 
 
 def run_classifiers_compare_and_score(
@@ -141,12 +142,11 @@ def run_classifiers_compare_and_score(
             if slice_path.exists():
                 print(f"\n--- Applying models to new slice: {slice_path.name} ---")
                 slice_adata = ad.read_h5ad(slice_path)
-                slice_id = slice_adata.uns[SLICE_ID]
-                annotation_path =   rf"{BASE_DIR}/outputs/cell_annotation/{slide_id}/05/{slice_num}/slice_{slice_num}_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
+                annotation_path = rf"{BASE_DIR}/outputs/cell_annotation/{slide_id}/05/{slice_num}/slice_{slice_num}_final_cell_annotations_refined_tabula_brain_tumor_avinoam.csv"
                 if pathlib.Path(annotation_path).exists():
                     annotation_df = pd.read_csv(annotation_path)
                     tumor_cells = _get_tumor_candidates_ids(slide_id, annotation_df)
-                    predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models)
+                    predict_tumor_on_new_slice(slice_adata, slice_num, tumor_cells, fitted_models)
                 else:
                     continue
     return {
@@ -533,12 +533,13 @@ def _plot_results(slide_id, slice_id, adata_sub, pca):
         _plot_tumor_cells(slide_id, slice_id, healthy_cells, model_name, pca)
 
 
-def predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models):
+def predict_tumor_on_new_slice(slice_adata, slice_id, tumor_cells, fitted_models):
     """
     Applies pre-trained models to a new slice.
     """
-    is_tumor_singler = slice_adata.obs_names.isin(tumor_cells)
-    adata_candidates = slice_adata[is_tumor_singler].copy()
+    slice_adata_copy = slice_adata.copy()
+    is_tumor_singler = slice_adata_copy.obs_names.isin(tumor_cells)
+    adata_candidates = slice_adata_copy[is_tumor_singler].copy()
 
     # 2. Preprocess exactly like the training set
     sc.pp.normalize_total(adata_candidates, target_sum=1e4)
@@ -555,23 +556,26 @@ def predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models):
 
         # Initialize the full adata column to 'Healthy' (1.0)
         score_col = f"score_healthy_{classifier_name}"
-        slice_adata.obs[score_col] = 1.0
+        slice_adata_copy.obs[score_col] = 1.0
 
-        slice_adata.obs.loc[is_tumor_singler, score_col] = scores
+        slice_adata_copy.obs.loc[is_tumor_singler, score_col] = scores
 
         # Labeling (1=Healthy, 0=Tumor)
-        pred_col = f"pred_healthy_{classifier_name}"
-        slice_adata.obs[pred_col] = (slice_adata.obs[score_col] >= PRED_HEALTHY_THRESHOLD).astype(int)
+        pred_healthy_col = f"pred_healthy_{classifier_name}"
+        pred_tumor_col = f"pred_tumor_{classifier_name}"
+        slice_adata_copy.obs[pred_healthy_col] = (slice_adata_copy.obs[score_col] >= PRED_HEALTHY_THRESHOLD).astype(int)
+        slice_adata.obs[pred_tumor_col] = (1 - slice_adata_copy.obs[pred_healthy_col]).astype(int)
 
+        slice_adata.write_h5ad(rf"{BASE_DIR}/resources/cache/with_tumor_prediction/slice_{slice_id}_adata.h5ad")
 
     # 5. Calculate Ensemble Mean
     score_cols = [f"score_healthy_{m}" for m in fitted_models.keys()]
-    slice_adata.obs["score_healthy_mean"] = slice_adata.obs[score_cols].mean(axis=1)
-    slice_adata.obs["pred_healthy_mean"] = (slice_adata.obs["score_healthy_mean"] >= 0.5).astype(int)
+    slice_adata_copy.obs["score_healthy_mean"] = slice_adata_copy.obs[score_cols].mean(axis=1)
+    slice_adata_copy.obs["pred_healthy_mean"] = (slice_adata_copy.obs["score_healthy_mean"] >= 0.5).astype(int)
 
     for classifier_name, model in fitted_models.items():
-        _plot_tumor_spatial_refined(slice_adata, tumor_cells, classifier_name, slice_adata.uns[SAMPLE_ID], slice_adata.uns[SLICE_ID])
-    return slice_adata
+        _plot_tumor_spatial_refined(slice_adata_copy, tumor_cells, classifier_name, slice_adata_copy.uns[SAMPLE_ID], slice_adata_copy.uns[SLICE_ID])
+    return slice_adata_copy
 
 
 def _plot_tumor_spatial_refined(adata, tumor_cells, classifier_name, sample_id, slice_id):
@@ -875,7 +879,7 @@ def run_classifiers_joint(pca=False, n_splits=5, random_state=42):
             annotation_df = pd.read_csv(annotation_path)
             tumor_cells = _get_tumor_candidates_ids(slide_id, annotation_df)
             print(f"  {len(tumor_cells)} tumor candidates")
-            predict_tumor_on_new_slice(slice_adata, tumor_cells, fitted_models)
+            predict_tumor_on_new_slice(slice_adata, slice_num, tumor_cells, fitted_models)
 
     return {
         "metrics_df": metrics_df,
@@ -964,7 +968,7 @@ def _plot_threshold_calibration(y_true, oof_prob, current_thresh=0.7):
     plt.show()
 
 
-def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_pcs=50):
+def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEALTHY_THRESHOLD, n_pcs=50):
     """
     Compares 4 tumor classifiers on the joint L321+L34 reference pool:
       1. LogReg             - StandardScaler + LogisticRegression (full gene space)
@@ -978,12 +982,6 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_
       - Tumor candidate counts per slice
       - Spatial comparison: 4-panel plot per slice
     """
-    from sklearn.neighbors import NearestNeighbors
-    from sklearn.metrics import (
-        accuracy_score, precision_score, recall_score, f1_score,
-        roc_auc_score, average_precision_score,
-        precision_recall_curve, roc_curve,
-    )
 
     slide_ids = ["L321", "L34"]
     primary_slices = {"L321": 1, "L34": 5}
@@ -1192,6 +1190,10 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_
             is_rejected = is_cand & ~is_tumor_m
             is_bg = ~is_cand
 
+            safe_name = mname.replace(" ", "_").replace("+", "_").replace("(", "").replace(")", "")
+            slice_adata.obs[f"pred_tumor_{safe_name}"] = is_tumor_m
+
+
             ax.scatter(x_all[is_bg],       y_all[is_bg],       c="#E0E0E0", s=0.4, alpha=0.2, linewidths=0, rasterized=True)
             ax.scatter(x_all[is_rejected], y_all[is_rejected], c="black",   s=0.8, alpha=0.4, linewidths=0, rasterized=True, label="Rejected")
             ax.scatter(x_all[is_tumor_m],  y_all[is_tumor_m],  c="red",     s=1.2, alpha=0.9, linewidths=0, rasterized=True, label="Tumor")
@@ -1202,6 +1204,8 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=0.75, n_
             ax.set_aspect("equal")
             ax.axis("off")
             ax.legend(loc="upper right", markerscale=4, fontsize=8)
+
+        slice_adata.write_h5ad(rf"{BASE_DIR}/resources/cache/with_tumor_prediction/slice_{snum}_adata.h5ad")
 
         plt.tight_layout()
         plt.show()
