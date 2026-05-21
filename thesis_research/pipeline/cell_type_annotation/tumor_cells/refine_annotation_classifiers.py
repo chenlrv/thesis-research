@@ -987,7 +987,6 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
     primary_slices = {"L321": 1, "L34": 5}
     remaining_slices_map = {"L321": [2, 3], "L34": [4, 6]}
 
-    # ── 1. Load + normalize per-sample ──────────────────────────────────────
     adatas_proc = {}
     for sid in slide_ids:
         adata = ad.read_h5ad(rf"{BASE_DIR}/resources/cache/sample_{sid}_adata.h5ad")
@@ -1205,8 +1204,6 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
             ax.axis("off")
             ax.legend(loc="upper right", markerscale=4, fontsize=8)
 
-        slice_adata.write_h5ad(rf"{BASE_DIR}/resources/cache/with_tumor_prediction/slice_{snum}_adata.h5ad")
-
         plt.tight_layout()
         plt.show()
 
@@ -1219,6 +1216,7 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
         if not slice_path.exists():
             continue
         slice_adata = ad.read_h5ad(slice_path)
+        slice_adata_original_X = slice_adata.X
         sc.pp.normalize_total(slice_adata, target_sum=1e4)
         sc.pp.log1p(slice_adata)
         slice_adata = slice_adata[:, joint_var_names].copy()
@@ -1234,6 +1232,7 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
             count_rows.append(row)
 
         _spatial_comparison(slice_adata, tumor_cells, sid, snum)
+        _write_tumor_slice(snum, slice_adata, slice_adata_original_X)
 
     for sid, nums in remaining_slices_map.items():
         for snum in nums:
@@ -1245,6 +1244,8 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
             if not slice_path.exists() or not ann_path.exists():
                 continue
             slice_adata = ad.read_h5ad(slice_path)
+            slice_adata_original_X = slice_adata.X
+
             sc.pp.normalize_total(slice_adata, target_sum=1e4)
             sc.pp.log1p(slice_adata)
             slice_adata = slice_adata[:, joint_var_names].copy()
@@ -1261,6 +1262,8 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
                 count_rows.append(row)
 
             _spatial_comparison(slice_adata, tumor_cells, sid, snum)
+            _write_tumor_slice(snum, slice_adata, slice_adata_original_X)
+
 
     counts_df = pd.DataFrame(count_rows).set_index("slice")
     print("\n=== Tumor Cell Counts per Slice ===")
@@ -1314,6 +1317,11 @@ def _get_nuclear_cell_ratio():
         plt.tight_layout()
         # plt.savefig(rf"D:/thesis-research/resources/cosmx/{slide_id}/{slide_id}_NC_ratio_kde.png", dpi=150)
         plt.show()
+
+
+def _write_tumor_slice(snum, slice_adata, slice_adata_original_X) -> None:
+    slice_adata.X = slice_adata_original_X
+    slice_adata.write_h5ad(rf"{BASE_DIR}/resources/cache/with_tumor_prediction/slice_{snum}_adata.h5ad")
 
 
 if __name__ == "__main__":
