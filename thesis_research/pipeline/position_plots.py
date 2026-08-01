@@ -2,9 +2,18 @@ from pathlib import Path
 
 from anndata import AnnData
 from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
+from matplotlib.collections import PatchCollection
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
+# Render FOV maps at a fixed data scale so a tile is always the same size on the
+# page and the layout reflects true pixel distances, regardless of tissue width.
+PX_PER_INCH = 13000.0  # data px per figure inch (constant across every FOV plot)
+FOV_TILE_FRAC = 0.92  # shrink each tile slightly so neighbouring FOVs stay distinct
+MIN_FIG_IN = 3.5
+MAX_FIG_IN = 18.0
 
 from thesis_research.utils.columns import (
     X_GLOBAL_PX,
@@ -54,24 +63,20 @@ def plot_fov_positions(
     fov_df[FOV] = pd.to_numeric(fov_df[FOV], errors="coerce").astype("Int64")
     fov_df = fov_df[fov_df[FOV].notna()]
 
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
-
     x = fov_df[X_GLOBAL_PX].to_numpy(float)
     y = fov_df[Y_GLOBAL_PX].to_numpy(float)
     fov_labels = fov_df[FOV].to_numpy()
+    pitch_x, pitch_y = _infer_fov_pitch(x, y)
+
+    fig, ax = plt.subplots(figsize=_fig_size_for_extent(x, y, pitch_x, pitch_y), dpi=200)
 
     faulty_set = set(int(f) for f in faulty_fovs) if faulty_fovs is not None else set()
     is_faulty = fov_df[FOV].isin(faulty_set).to_numpy()
 
-    ax.scatter(x[~is_faulty], y[~is_faulty], s=100, marker="s", c="#cfe8f3", edgecolors="none")
-    ax.scatter(
-        x[is_faulty],
-        y[is_faulty],
-        s=110,
-        marker="s",
-        c=faulty_color,
-        edgecolors="black",
-        linewidths=0.6,
+    _draw_fov_tiles(ax, x[~is_faulty], y[~is_faulty], "#cfe8f3", pitch_x, pitch_y)
+    _draw_fov_tiles(
+        ax, x[is_faulty], y[is_faulty], faulty_color, pitch_x, pitch_y,
+        edgecolor="black", linewidth=0.6,
     )
 
     for xi, yi, label in zip(x, y, fov_labels):
@@ -83,7 +88,7 @@ def plot_fov_positions(
     ax.set_xlabel("Global X Position (px)")
     ax.set_ylabel("Global Y Position (px)")
 
-    ax.set_aspect("equal", adjustable="box")
+    _frame_fov_axes(ax, x, y, pitch_x, pitch_y)
     ax.grid(True, alpha=0.25)
 
     plt.tight_layout()
@@ -111,13 +116,14 @@ def plot_fov_positions_all_slices(
     )
     fov_df = _add_slice_column(fov_df, fov_to_slice)
 
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=200)
-
     x = fov_df[X_GLOBAL_PX].to_numpy(float)
     y = fov_df[Y_GLOBAL_PX].to_numpy(float)
     fov_labels = fov_df[FOV].to_numpy()
+    pitch_x, pitch_y = _infer_fov_pitch(x, y)
     slice_index = pd.to_numeric(fov_df[SLICE_ID], errors="coerce")
     slice_ids = sorted(slice_index.dropna().unique().astype(int).tolist())
+
+    fig, ax = plt.subplots(figsize=_fig_size_for_extent(x, y, pitch_x, pitch_y), dpi=200)
 
     tumor_slice_ids = (
         adata.obs.loc[adata.obs[SLICE_TYPE] == "tumor", SLICE_ID].dropna().unique().tolist()
@@ -127,7 +133,7 @@ def plot_fov_positions_all_slices(
         m = (slice_index == slice_id).to_numpy()
         if not np.any(m):
             continue
-        ax.scatter(x[m], y[m], s=100, marker="s", c=[slice_to_color[slice_id]], edgecolors="none")
+        _draw_fov_tiles(ax, x[m], y[m], slice_to_color[slice_id], pitch_x, pitch_y)
 
         if slice_id in tumor_slice_ids:
             cx, cy = np.median(x[m]), np.median(y[m])
@@ -166,7 +172,7 @@ def plot_fov_positions_all_slices(
     ax.set_xlabel("Global X Position (px)")
     ax.set_ylabel("Global Y Position (px)")
 
-    ax.set_aspect("equal", adjustable="box")
+    _frame_fov_axes(ax, x, y, pitch_x, pitch_y)
     ax.grid(True, alpha=0.25)
 
     plt.tight_layout()
@@ -191,8 +197,13 @@ def plot_fov_positions_for_slice(
         .to_dict()
     )
     fov_df = _add_slice_column(fov_df, fov_to_slice)
-    fov_df = fov_df[fov_df[SLICE_ID] == slice_id]
 
+    # Pitch is inferred from the full grid so every slice renders at the same tile size.
+    pitch_x, pitch_y = _infer_fov_pitch(
+        fov_df[X_GLOBAL_PX].to_numpy(float), fov_df[Y_GLOBAL_PX].to_numpy(float)
+    )
+
+    fov_df = fov_df[fov_df[SLICE_ID] == slice_id]
     x = fov_df[X_GLOBAL_PX].to_numpy(float)
     y = fov_df[Y_GLOBAL_PX].to_numpy(float)
     labels = fov_df[FOV].astype("Int64").to_numpy()
@@ -201,8 +212,10 @@ def plot_fov_positions_for_slice(
     n_cells_slice = adata.n_obs
     area_sum = pd.to_numeric(adata.obs[AREA_MICROMETERS]).sum()
 
-    fig, ax = plt.subplots(figsize=(8, 5), dpi=300, constrained_layout=False)
-    ax.scatter(x, y, s=120, marker="s", c=[slice_to_color[int(slice_id)]], edgecolors="none")
+    fig, ax = plt.subplots(
+        figsize=_fig_size_for_extent(x, y, pitch_x, pitch_y), dpi=300, constrained_layout=False
+    )
+    _draw_fov_tiles(ax, x, y, slice_to_color[int(slice_id)], pitch_x, pitch_y)
     for xi, yi, lab in zip(x, y, labels):
         if pd.notna(lab):
             ax.text(xi, yi, str(int(lab)), ha="center", va="center", fontsize=2, color="black")
@@ -215,7 +228,7 @@ def plot_fov_positions_for_slice(
     )
     ax.set_xlabel("Global X (px)")
     ax.set_ylabel("Global Y (px)")
-    ax.set_aspect("equal", adjustable="box")
+    _frame_fov_axes(ax, x, y, pitch_x, pitch_y)
     ax.grid(True, alpha=0.25)
 
     fig.suptitle(f"{sample_id} — FOV Positions", fontsize=16, fontweight="bold")
@@ -351,6 +364,85 @@ def _add_slice_column(fov_df: pd.DataFrame, fov_to_slice: dict[str, str]) -> pd.
 
     fov_df[SLICE_ID] = fov_df[FOV].map(fov_to_slice).astype("Int64")
     return fov_df
+
+
+def _infer_fov_pitch(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    """Infer the FOV tile size (px) from the spacing of the FOV grid.
+
+    Uses the median nearest-neighbour distance between FOV reference points,
+    which equals the true FOV pitch: every interior FOV abuts a neighbour one
+    pitch away, and the median is robust to the per-row stage jitter that makes
+    raw coordinate diffs unreliable. FOVs are square, so the same pitch is used
+    for both axes.
+    """
+    from scipy.spatial import cKDTree
+
+    pts = np.column_stack([x, y])
+    pts = pts[np.all(np.isfinite(pts), axis=1)]
+    if len(pts) < 2:
+        return float("nan"), float("nan")
+
+    dist, _ = cKDTree(pts).query(pts, k=2)
+    pitch = float(np.median(dist[:, 1]))
+    return pitch, pitch
+
+
+def _fig_size_for_extent(
+    x: np.ndarray, y: np.ndarray, pitch_x: float, pitch_y: float
+) -> tuple[float, float]:
+    """Figure size (inches) for the data extent at a fixed px-per-inch scale.
+
+    Scaling both axes by the same factor keeps tiles square and the same size on
+    every plot; bounds only cap pathologically large/small canvases.
+    """
+    w_px = (np.nanmax(x) - np.nanmin(x)) + pitch_x
+    h_px = (np.nanmax(y) - np.nanmin(y)) + pitch_y
+    w_in, h_in = w_px / PX_PER_INCH, h_px / PX_PER_INCH
+
+    big = max(w_in, h_in)
+    if big > MAX_FIG_IN:
+        w_in, h_in = w_in * MAX_FIG_IN / big, h_in * MAX_FIG_IN / big
+    small = min(w_in, h_in)
+    if small < MIN_FIG_IN:
+        w_in, h_in = w_in * MIN_FIG_IN / small, h_in * MIN_FIG_IN / small
+    return w_in, h_in
+
+
+def _draw_fov_tiles(
+    ax,
+    x: np.ndarray,
+    y: np.ndarray,
+    facecolor,
+    pitch_x: float,
+    pitch_y: float,
+    edgecolor="none",
+    linewidth: float = 0.0,
+    zorder: int = 1,
+) -> None:
+    """Draw FOVs as data-coordinate rectangles so they scale with real distance."""
+    w, h = pitch_x * FOV_TILE_FRAC, pitch_y * FOV_TILE_FRAC
+    rects = [Rectangle((xi - w / 2, yi - h / 2), w, h) for xi, yi in zip(x, y)]
+    coll = PatchCollection(
+        rects,
+        facecolors=facecolor,
+        edgecolors=edgecolor,
+        linewidths=linewidth,
+        zorder=zorder,
+    )
+    ax.add_collection(coll)
+
+
+def _frame_fov_axes(
+    ax, x: np.ndarray, y: np.ndarray, pitch_x: float, pitch_y: float, margin_frac: float = 0.04
+) -> None:
+    """Set equal-aspect limits around the FOV tiles (patches don't autoscale)."""
+    xmin, xmax = np.nanmin(x), np.nanmax(x)
+    ymin, ymax = np.nanmin(y), np.nanmax(y)
+    mx = pitch_x * (0.5 + margin_frac) + (xmax - xmin) * margin_frac
+    my = pitch_y * (0.5 + margin_frac) + (ymax - ymin) * margin_frac
+    ax.set_xlim(xmin - mx, xmax + mx)
+    ax.set_ylim(ymin - my, ymax + my)
+    ax.set_aspect("equal", adjustable="box")
 
 
 def _get_slice_to_color(slice_ids: list[str]) -> dict[int, tuple]:

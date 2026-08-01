@@ -1,0 +1,46 @@
+Genes to differentiate myeloid 
+
+All Myeloid Cells:
+Aif1, Csf1r, Itgam, Ptprc, C1qa, C1qb, C1qc, Tyrobp, Fcer1g, Cd68, Mertk, Itgb2, Cd14, Cd52, Cd84, Cd33, Csf2ra, Csf3r, Cx3cr1
+
+Microglia:
+What it should express- TMEM119 (drops in disease), Adgrg1, Hpgds, Selplg, Gpr183, high Cx3cr1, high C1qa/b/c
+
+They can also express in disease*- Apoe/Spp1/Gpnmb/Trem2/Cd9/Itgax/Lgals3
+
+What it should not express- 
+•	That is expressed by BAM: Mrc1, Lyve1, Cd163, Pf4, Cd36, Igf1, Maf, Selenop, Cd5l
+•	That is expressed by MDM: Itgal (microglia actively repress it), S100a8, S100a9, Plac8, Vcan, Sell, Ccr2, Fn1, Crip1, Ace, Clec12a, Fpr1, Ccr1, Arg1, Anxa1, Lgals1, Thbs1, Ifitm3 
+
+BAMs:
+What it should express-  Mrc1, Lyve1, Cd163, Pf4, Cd36, Cd38, Igf1, Maf, Selenop, Cd5l 
+
+What they share with MDM and microglia on some conditions- Mrc1, Cd163, Cd36, Selenop, Cd5l, Igf1, Arg1, Apoe
+
+What it should not express- 
+•	That is expressed by microglia: TMEM119, Adgrg1
+•	That is expressed by MDM- S100a8, S100a9, Plac8, Vcan, Sell, Ccr2, Fn1, Crip1, Clec12a 
+
+MDM:
+What it should express-  
+recent monocytes: Ccr2, S100a8, S100a9, Plac8, Sell, Vcan, Fn1, Crip1, Ace; 
+Differentiated monocytes: Clec12a, Itgal, Ifitm3, Cxcr4, Fpr1, Ccr1, Arg1, Slc40a1, Anxa1, Lgals1, Thbs1
+
+What it should not express- 
+•	That is expressed by microglia: TMEM119, Adgrg1, Hpgds, Gpr183. 
+•	That is expressed by BAM: Pf4 (although not true in disease, as they can show low levels of it), Lyve1, Maf.
+
+
+
+
+
+Additional notes:
+
+*Expression of BAM/Macrophage Markers in Activated Microglia (Mrc1, Cd163):
+While Mrc1 (CD206) and Cd163 are robust baseline markers for BAMs, they are significantly upregulated in microglia under severe pathological stress. Consequently, low-to-moderate expression of these transcripts should not be used as an exclusionary criterion for microglia in diseased tissue.
+
+*Lineage-Agnostic Activation Signatures (Trem2, Apoe):
+Although Trem2 and Apoe are canonical pillars of the Disease-Associated Microglia (DAM) phenotype, they are highly expressed by infiltrating MDMs upon parenchymal entry. Because these genes reflect generalized lipid metabolism and phagocytic responses rather than ontogeny, they lack the specificity needed to distinguish between activated microglia and MDMs.
+
+*Ambiguity of Disease-Specific Genes (Spp1, Gpnmb):
+In highly inflammatory microenvironments, Spp1 and Gpnmb undergo extreme transcriptional upregulation. High expression of these markers typically marks a split topology: they represent either localized, highly phagocytic microglial subsets or active, transition-state MDMs. Differential mapping of these clusters requires integration with stable core markers (e.g., Hexb vs. Itgal/Ccr2).

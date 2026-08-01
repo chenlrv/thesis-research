@@ -4,7 +4,7 @@ import scanpy as sc
 import numpy as np
 from anndata import AnnData
 from matplotlib import pyplot as plt
-
+import matplotlib.lines as mlines
 import umap
 import matplotlib.colors as mcolors
 
@@ -293,6 +293,24 @@ def plot_spatial_clusters(
 
     fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     ax.scatter(x, y, c=point_colors, s=s, alpha=alpha, linewidths=0, rasterized=True)
+
+    # --- ADDING THE LEGEND START ---
+    # Create "proxy" points for the legend
+    legend_handles = [
+        mlines.Line2D([], [], color=color, marker="o", linestyle="None", markersize=10, label=cat)
+        for cat, color in cat2color.items()
+    ]
+
+    # Place legend to the right of the plot
+    ax.legend(
+        handles=legend_handles,
+        title=color_col,
+        loc="center left",
+        bbox_to_anchor=(1, 0.5),
+        frameon=False,
+        prop={"size": 12},
+    )
+    # --- ADDING THE LEGEND END ---
     ax.set_aspect("equal", adjustable="box")
 
     # ax.invert_xaxis()

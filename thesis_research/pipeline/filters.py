@@ -10,7 +10,7 @@ def get_negative_system_probes(adata: AnnData) -> AnnData:
 
     print(f"Checking for negative and system control probes...")
 
-    negative_mask = adata.var_names.str.startswith("Negative")
+    negative_mask = adata.var_names.str.startswith("Neg")
     system_control_mask = adata.var_names.str.startswith("SystemControl")
 
     combined_mask = negative_mask | system_control_mask

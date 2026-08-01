@@ -1,4 +1,3 @@
-
 import anndata as ad
 import pandas as pd
 import numpy as np
@@ -69,7 +68,9 @@ def summarize_labels_by_cluster(
       - counts (n/N)
       - optional median probability for cells supporting that top label (if prob_col provided)
     """
-    df = adata.obs[[cluster_key, label_col] + ([] if prob_col is None else [prob_col])].dropna(subset=[cluster_key, label_col])
+    df = adata.obs[[cluster_key, label_col] + ([] if prob_col is None else [prob_col])].dropna(
+        subset=[cluster_key, label_col]
+    )
 
     # counts per (cluster, label)
     counts = df.groupby([cluster_key, label_col]).size().rename("n").reset_index()
@@ -82,16 +83,17 @@ def summarize_labels_by_cluster(
     # pick top label per cluster
     top = (
         counts.sort_values([cluster_key, "fraction", "n"], ascending=[True, False, False])
-              .groupby(cluster_key)
-              .head(1)
-              .set_index(cluster_key)
-              .rename(columns={label_col: "top_label"})
+        .groupby(cluster_key)
+        .head(1)
+        .set_index(cluster_key)
+        .rename(columns={label_col: "top_label"})
     )
 
     out = top[["top_label", "fraction", "n", "N"]].copy()
 
     # optional: median prob for the top label’s cells
     if prob_col is not None:
+
         def median_prob(g):
             tl = out.loc[g.name, "top_label"]
             return g.loc[g[label_col] == tl, prob_col].median()
@@ -112,23 +114,24 @@ def add_cluster_level_label(
     Label each Leiden cluster using the most common per-cell label in that cluster,
     then map it back to every cell.
     """
-    mapping = (
-        adata.obs.groupby(cluster_key)[per_cell_label_col]
-        .agg(lambda x: x.value_counts().index[0])
+    mapping = adata.obs.groupby(cluster_key)[per_cell_label_col].agg(
+        lambda x: x.value_counts().index[0]
     )
     adata.obs[out_col] = adata.obs[cluster_key].map(mapping).astype("category")
     return adata, mapping
 
 
-
-
-mmc_df = pd.read_csv('D:\\thesis-research\\resources\\map_my_cells\\cell_type_mapping.csv', skiprows=4)
+mmc_df = pd.read_csv(
+    "D:\\thesis-research\\resources\\map_my_cells\\cell_type_mapping.csv", skiprows=4
+)
 
 # Now you should have proper columns
 print(mmc_df.head())
 print(mmc_df.columns)
 
-adata = ad.read_h5ad("D:\\thesis-research\\resources\\clustering\\adata_full_with_pca_clustered.h5ad")
+adata = ad.read_h5ad(
+    "D:\\thesis-research\\resources\\clustering\\adata_full_with_pca_clustered.h5ad"
+)
 
 adata = attach_mapmycells(adata, mmc_df)
 
@@ -154,8 +157,4 @@ adata, cluster_to_label = add_cluster_level_label(
 )
 
 # 5) plot
-sc.pl.umap(
-    adata,
-    color=["leiden_scvi", "mmc_label_fallback", "leiden_scvi_mmc_label"],
-    wspace=0.4
-)
+sc.pl.umap(adata, color=["leiden_scvi", "mmc_label_fallback", "leiden_scvi_mmc_label"], wspace=0.4)

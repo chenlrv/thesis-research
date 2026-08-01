@@ -46,7 +46,9 @@ def clustering_no_pca():
     )
     plt.close()
 
-    adata.write_h5ad("D:\\thesis-research\\resources\\clustering\\adata_full_no_pca_clustered2.h5ad")
+    adata.write_h5ad(
+        "D:\\thesis-research\\resources\\clustering\\adata_full_no_pca_clustered2.h5ad"
+    )
 
 
 # def run_clustering_pipeline():

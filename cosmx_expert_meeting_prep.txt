@@ -1,0 +1,118 @@
+CosMx Data — Expert Meeting Prep
+
+Follow-up call with the CosMx vendor on our annotation problems. Built from
+Claire's written answers + our comments and findings.
+
+=====================================================================
+
+0. ASK UP FRONT
+
+- Record the meeting.
+- Send the slides + report before the call.
+- Confirm the manufacturing/QC-log review is done and share it.
+- Can Doron join?
+
+=====================================================================
+
+A. OUR OWN PREP (before the call)
+
+Reuven & Avinoam walk us through the workflow so we ask informed questions:
+- Panel = Mouse 1K Universal Cell Panel (deliberate, for immune/stromal TME —
+  not Neuroscience).
+- Morphology kit channels (DAPI, PanCK, Membrane, CD45, "G") + segmentation
+  algo (AtoMx v6, image-based).
+- How FOVs were chosen (we skipped artifact regions -> discontinuous grid).
+- The 8 custom probes — target + purpose of each.
+
+The 8 custom probes: GFP (Cx3cr1 reporter), tdTomato (MDM reporter), TMEM119,
+Trem2, Lyve1, GFAP, Ccl2, Cxcl13. (Cx3cr1 itself is standard panel, not custom.)
+
+Evidence we bring (prepare 1–2 slides):
+1. GFP is a dead probe — S/N ~1.73 vs GFAP control 12.5; only 42% of counts
+   above background.
+2. GFP vs Cx3cr1 negative correlation (r ~ -0.5 all slices) — expected positive.
+3. tdTomato paradox — higher in microglia than MDMs in every slice (opposite of
+   expected).
+4. Lyve1 sparse/non-specific — brain-wide, not perivascular; low dynamic range.
+5. Segmentation is not the cause — our re-seg test moved nothing (purity
+   0.802->0.802; foreign transcripts ~2% median).
+6. Ceiling is specific — astro/ependymal separate cleanly; microglia vs
+   macrophage near chance (AUC ~0.59).
+
+=====================================================================
+
+B. QUESTIONS FOR THE EXPERTS
+
+Custom probes
+1. Give us a per-probe performance table (counts, % above background, S/N) for
+   all 8 across the 6 tissues — not just "most look fine."
+2. GFP is at background (S/N 1.73). Do you agree it failed, and does the
+   manufacturing log explain it?
+3. Your report says "Ccl22" — our custom target is Ccl2. Which was actually made
+   and detected?
+4. Beyond intracellular localization, what evidence shows each probe binds its
+   intended target (off-target/cross-hyb checks)?
+
+Reporter transgenes
+5. In your experience, how often is GFP mRNA undetectable in CosMx despite clear
+   GFP protein? A base rate would help a lot.
+6. GFP–Cx3cr1 is negatively correlated. Given GFP looks failed, is this an
+   artifact — and can we salvage any myeloid internal control?
+7. Any recommended orthogonal validation (IF/protein) to anchor microglia-vs-MDM
+   identity?
+
+Segmentation & FOV quality
+8. What quantitative criteria flag a low-quality FOV?
+9. Should we exclude poor FOVs?
+11. Is full re-segmentation (Baysor/Cellpose/proseg/SAM) worth it here? Our export
+    has the label-mask TIFFs (CellLabels/CompartmentLabels) but not the raw
+    multichannel morphology images — only lossy JPG composites. Can you provide
+    the raw Morphology2D TIFFs?
+12. Anything that can be done at the image level where membrane or nuclei signal
+    is too weak to segment (restaining, image enhancement)?
+13. On slide 2 (L3-21) only 70.7% of transcripts are intracellular (~30%
+    extracellular). Is that within spec, and how far should we trust per-cell
+    counts there?
+
+Imaging / H&E
+14. What is the recommended workflow to project our H&E images to the CosMx
+    FOV/cell coordinates, and which coordinate space should we align to?
+
+Trust boundary
+15. Since non-tumor segmentation can't improve much, can we still trust the tumor
+    + TME results (our actual focus)? Yes / with caveats.
+16. High counts in cerebellar grey matter — is our density+panel interpretation
+    reasonable?
+
+Spillover & BAMs
+17. You attribute high GFAP to astrocyte processes bleeding into neighboring cells.
+    Microglia and neurons are branched the same way, so their process transcripts
+    should leak into neighbors too and corrupt the very cells we classify. How is
+    this process-derived signal handled in brain CosMx studies?
+18. Which multi-marker BAM definition do you recommend on this panel?
+
+Annotation / reference
+19. Given ~20% panel overlap with your brain profile, is InSituType expected to
+    beat our current SingleR for microglia/MDM/BAM, or does it hit the same
+    ceiling?
+20. Do you agree the UCC panel is informationally insufficient to finely split
+    microglia vs macrophage, or do you know a method that recovers it?
+21. Tips for building/validating our own scRNA-seq reference on the UCC gene space.
+22. Given the process-derived spillover (Q17), what annotation procedure do you
+    recommend to stay robust to it — or should we correct spillover before
+    typing?
+
+Open docs
+23. Manufacturing/QC logs (esp. GFP, Ccl2) — done? Share.
+24. How do our add-on probes compare to prior custom-probe failures you've seen?
+
+=====================================================================
+
+C. DECISIONS TO LEAVE WITH
+
+1. Keep / flag / discard verdict per custom probe.
+2. Any ground truth for myeloid subtypes, or accept merged/confidence-weighted
+   calls.
+3. Segmentation: keep-and-flag vs re-segment (+ TIFFs if we re-seg).
+4. Explicit confirmation that tumor + TME conclusions are valid.
+6. Committed date for the logs + full QC report.

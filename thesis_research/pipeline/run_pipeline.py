@@ -49,8 +49,7 @@ def run_pipeline(run_exploration: bool = False, run_qc: bool = False) -> None:
     if run_qc:
         run_qc_pipeline(run_id, slice_adatas)
 
-    run_clustering_pipeline()
-
+    # run_clustering_pipeline()
 
 
 def run_exploration_pipeline(run_id: str, save: bool = False) -> list[AnnData]:
@@ -72,17 +71,17 @@ def run_exploration_pipeline(run_id: str, save: bool = False) -> list[AnnData]:
 
         slice_adatas.update(sample_slice_adatas)
 
-    if save:
-        for slice_id, adata in slice_adatas.items():
-            adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata.h5ad", compression="gzip")
-            print(f"💾 Saved adata for slice {slice_id} to cache!")
+    # if save:
+    #     for slice_id, adata in slice_adatas.items():
+    #         adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata.h5ad", compression="gzip")
+    #         print(f"💾 Saved adata for slice {slice_id} to cache!")
 
     print("☑️ Successfully finished exploration! ☑️")
     return list(slice_adatas.values())
 
 
 def run_qc_pipeline(
-    run_id: str, slice_adatas: list[AnnData], fov_qc: bool = False, save: bool = False
+    run_id: str, slice_adatas: list[AnnData], fov_qc: bool = False, save: bool = True
 ) -> None:
     print(f"🔵 Starting QC pipeline...")
 
@@ -95,8 +94,8 @@ def run_qc_pipeline(
             adata = run_fov_qc(adata, run_id)
 
         adata = run_cell_qc(adata, run_id)
-        probes = get_negative_system_probes(adata)
-        adata = remove_negative_system_probes(adata, probes)
+        # probes = get_negative_system_probes(adata)
+        # adata = remove_negative_system_probes(adata, probes)
 
         processed_slice_adatas.append(adata)
 
@@ -125,18 +124,18 @@ def _get_adata(sample_id: str) -> AnnData:
     print(f"🕒 Getting adata for sample {sample_id}...")
     adata_file_path = get_sample_resource_path(SampleEntityType.ADATA_FILE, sample_id)
 
-    if adata_file_path.exists():
-        print("Loading cached adata...")
-        adata = ad.read_h5ad(adata_file_path)
-    else:
-        print("Loading adata from raw files...")
-        adata = _load_adata(sample_id)
-        adata = _add_unique_id_per_cell(adata, sample_id)
+    # if adata_file_path.exists():
+    #     print("Loading cached adata...")
+    #     adata = ad.read_h5ad(adata_file_path)
+    # else:
+    #     print("Loading adata from raw files...")
+    adata = _load_adata(sample_id)
+    adata = _add_unique_id_per_cell(adata, sample_id)
 
-        slices = load_slices_from_csv(sample_id)
-        adata = _add_slice_metadata(adata, slices)
+    slices = load_slices_from_csv(sample_id)
+    adata = _add_slice_metadata(adata, slices)
 
-        adata.write(adata_file_path, compression="gzip")
+    adata.write(adata_file_path, compression="gzip")
 
     print(f"Adata {sample_id} initial shapes:\n" f"Cells: {adata.n_obs}\n" f"Genes: {adata.n_vars}")
 
@@ -195,19 +194,19 @@ def _merge_slice_adatas(slice_adatas: list[AnnData], sample_id: str) -> AnnData:
 def _save_adatas(slice_adatas: list[AnnData], sample_adatas: list[AnnData]) -> None:
     for slice_adata in slice_adatas:
         slice_id = slice_adata.uns[SLICE_ID]
-        slice_adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata.h5ad", compression="gzip")
+        slice_adata.write_h5ad(CACHE_DIR_PATH / f"slice_{slice_id}_adata_with_neg.h5ad", compression="gzip")
         print(f"💾 Saved adata for slice {slice_id} to cache!")
 
-    for sample_adata in sample_adatas:
-        sample_id = sample_adata.uns[SAMPLE_ID]
-        sample_adata.write_h5ad(
-            CACHE_DIR_PATH / f"sample_{sample_id}_adata.h5ad", compression="gzip"
-        )
-        print(f"💾 Saved adata for sample {sample_id} to cache!")
-
-    adata = _merge_sample_adatas(sample_adatas)
-    adata.write_h5ad(CACHE_DIR_PATH / "adata_full.h5ad", compression="gzip")
-    print(f"💾 Saved merged adata for all samples to cache!")
+    # for sample_adata in sample_adatas:
+    #     sample_id = sample_adata.uns[SAMPLE_ID]
+    #     sample_adata.write_h5ad(
+    #         CACHE_DIR_PATH / f"sample_{sample_id}_adata.h5ad", compression="gzip"
+    #     )
+    #     print(f"💾 Saved adata for sample {sample_id} to cache!")
+    #
+    # adata = _merge_sample_adatas(sample_adatas)
+    # adata.write_h5ad(CACHE_DIR_PATH / "adata_full.h5ad", compression="gzip")
+    # print(f"💾 Saved merged adata for all samples to cache!")
 
 
 def _merge_sample_adatas(adatas: list[AnnData]) -> AnnData:
@@ -218,4 +217,4 @@ def _merge_sample_adatas(adatas: list[AnnData]) -> AnnData:
     )
 
 
-run_pipeline(run_exploration=True)
+run_pipeline(run_exploration=True, run_qc=True)

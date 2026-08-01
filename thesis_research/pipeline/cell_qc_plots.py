@@ -54,7 +54,7 @@ def _generate_log2_count_cutoff_histogram(
     output_dir: Path,
 ) -> None:
     """
-    Generate a histogram of the log2 counts per cell.
+    Generate a histogram of the log2 counts per cell.pytho
     """
     fig = plt.figure(figsize=(3.0, 2.2), dpi=300)
     num_cells_to_remove = flag.sum()
