@@ -189,16 +189,12 @@ def _get_classifier_models(random_state, scale_pos_weight):
             random_state=random_state,
             n_jobs=-1,
         ),
+        # xgboost 3.2.0 library defaults. Leave-one-out cross-validation
+        # (thesis_plots/xgb_default_sensitivity.py) found no hyperparameter
+        # setting distinguishable from its default on this reference pool.
         "xgboost": XGBClassifier(
-            n_estimators=300,
-            max_depth=4,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            reg_lambda=1.0,
             objective="binary:logistic",
             eval_metric="logloss",
-            scale_pos_weight=scale_pos_weight,
             random_state=random_state,
             n_jobs=-1,
             verbosity=0,
@@ -231,9 +227,7 @@ def _get_classifier_models_pca(random_state, scale_pos_weight, n_pcs=50):
             ("scaler", StandardScaler()),
             ("pca", PCA(n_components=n_pcs, random_state=random_state)),
             ("clf", XGBClassifier(
-                n_estimators=300, max_depth=4, learning_rate=0.05,
-                scale_pos_weight=scale_pos_weight, random_state=random_state,
-                n_jobs=-1, verbosity=0
+                random_state=random_state, n_jobs=-1, verbosity=0
             )),
         ]),
     }
@@ -1039,11 +1033,9 @@ def run_model_comparison(n_splits=5, random_state=42, k=15, prob_thresh=PRED_HEA
         ("clf", LogisticRegression(C=1.0, class_weight="balanced",
                                    max_iter=5000, solver="liblinear", random_state=random_state)),
     ])
+    # xgboost 3.2.0 library defaults -- see thesis_plots/xgb_default_sensitivity.py.
     xgb_model = XGBClassifier(
-        n_estimators=300, max_depth=4, learning_rate=0.05,
-        subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0,
-        scale_pos_weight=scale_pos_weight, random_state=random_state,
-        n_jobs=-1, verbosity=0, eval_metric="logloss",
+        random_state=random_state, n_jobs=-1, verbosity=0, eval_metric="logloss",
     )
     logreg_knn_clf = LogisticRegression(
         max_iter=3000, class_weight="balanced", random_state=random_state

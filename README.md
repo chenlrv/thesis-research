@@ -82,8 +82,14 @@ low-transcript filter — per slice, `threshold = max(20, P5)` of the per-cell t
 distribution — in `thesis_research/pipeline/cell_qc_plots.py`
 (`run_cell_qc`, `_low_count_flag`).
 
-Produces **Figure 1** (`position_plots.py`) and **Figure 2** (`cell_qc_plots.py`),
-and the counts behind **Table 1**.
+Produces **Figure 1** (`position_plots.py`) and the counts behind **Table 1**.
+**Figure 2** — the six-panel count-distribution grid — is rendered separately by
+`thesis_plots/make_qc_count_threshold_fig.py`, which re-derives the same cutoff from
+the raw vendor metadata and checks its per-slice cell counts against Table 1:
+
+```bash
+conda run -n thesis_research python thesis_plots/make_qc_count_threshold_fig.py
+```
 
 ### Stage 1 — Reference-based annotation (SingleR)
 
@@ -183,8 +189,6 @@ Each is also flagged in Supplementary Table S1.
   `figure_4_spatial_refinement.py` and written to its CSV; the figure is the XGBoost
   column of Figure 5 replotted by hand as a 2×3 grid. Needs a small variant of that
   script that filters to XGBoost and re-lays out the panels.
-- **Figure 2** — `cell_qc_plots.py` writes one histogram per slice; the combined
-  six-panel figure used in the thesis is not assembled by a script.
 - **Tables 1 and 3** have their values hardcoded in `make_nature_tables.py` rather than
   read from the analysis outputs.
 - **`detection_barplot_all6.png` is stale** — the committed PNG has two panels while the

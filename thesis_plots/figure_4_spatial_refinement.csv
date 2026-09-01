@@ -1,0 +1,31 @@
+slice,slide,type,model,n_candidates,n_retained_tumor,n_rejected_lookalike,pct_retained
+1,L321,Tumor,LogReg,5793,4218,1575,72.81
+1,L321,Tumor,LogReg + PCA,5793,4512,1281,77.89
+1,L321,Tumor,LogReg + KNN (PCA),5793,4100,1693,70.78
+1,L321,Tumor,Random Forest,5793,4207,1586,72.62
+1,L321,Tumor,XGBoost,5793,4267,1526,73.66
+2,L321,Tumor,LogReg,7650,6134,1516,80.18
+2,L321,Tumor,LogReg + PCA,7650,6362,1288,83.16
+2,L321,Tumor,LogReg + KNN (PCA),7650,5938,1712,77.62
+2,L321,Tumor,Random Forest,7650,6054,1596,79.14
+2,L321,Tumor,XGBoost,7650,6272,1378,81.99
+3,L321,Control,LogReg,343,0,343,0.0
+3,L321,Control,LogReg + PCA,343,8,335,2.33
+3,L321,Control,LogReg + KNN (PCA),343,2,341,0.58
+3,L321,Control,Random Forest,343,0,343,0.0
+3,L321,Control,XGBoost,343,0,343,0.0
+4,L34,Control,LogReg,287,0,287,0.0
+4,L34,Control,LogReg + PCA,287,6,281,2.09
+4,L34,Control,LogReg + KNN (PCA),287,1,286,0.35
+4,L34,Control,Random Forest,287,0,287,0.0
+4,L34,Control,XGBoost,287,0,287,0.0
+5,L34,Tumor,LogReg,8129,4755,3374,58.49
+5,L34,Tumor,LogReg + PCA,8129,5329,2800,65.56
+5,L34,Tumor,LogReg + KNN (PCA),8129,4463,3666,54.9
+5,L34,Tumor,Random Forest,8129,4693,3436,57.73
+5,L34,Tumor,XGBoost,8129,5039,3090,61.99
+6,L34,Tumor,LogReg,9296,5142,4154,55.31
+6,L34,Tumor,LogReg + PCA,9296,5663,3633,60.92
+6,L34,Tumor,LogReg + KNN (PCA),9296,4681,4615,50.35
+6,L34,Tumor,Random Forest,9296,5009,4287,53.88
+6,L34,Tumor,XGBoost,9296,5295,4001,56.96

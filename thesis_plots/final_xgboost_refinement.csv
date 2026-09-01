@@ -1,0 +1,7 @@
+slice,slide,type,model,source,n_candidates,n_retained_tumor,n_rejected_lookalike,pct_retained
+1,L321,Tumor,XGBoost,refit,5793,4267,1526,73.66
+2,L321,Tumor,XGBoost,refit,7650,6272,1378,81.99
+3,L321,Control,XGBoost,refit,343,0,343,0.0
+4,L34,Control,XGBoost,refit,287,0,287,0.0
+5,L34,Tumor,XGBoost,refit,8129,5039,3090,61.99
+6,L34,Tumor,XGBoost,refit,9296,5295,4001,56.96

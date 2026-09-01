@@ -109,11 +109,8 @@ def _style_panel_border(ax, slice_type: str):
 
 
 def make_figure(out_path: pathlib.Path):
+    # No figure title: the caption carries it in the thesis.
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
-    fig.suptitle(
-        "Initial tumor candidates from reference-based annotation (SingleR)",
-        fontsize=16, fontweight="bold", y=0.98,
-    )
 
     layout = {
         (0, 0): 1, (0, 1): 2, (0, 2): 3,
@@ -171,7 +168,7 @@ def make_figure(out_path: pathlib.Path):
     fig.legend(handles=handles, loc="lower center", ncol=4,
                frameon=False, fontsize=11, bbox_to_anchor=(0.5, 0.0))
 
-    plt.tight_layout(rect=[0, 0.035, 1, 0.955])
+    plt.tight_layout(rect=[0, 0.035, 1, 1])
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     print(f"saved: {out_path}\n")
 

@@ -1,0 +1,7 @@
+slice,slide,mouse,type,n_total,n_candidates,pct_candidates
+1,L321,2,Tumor,124956,5793,4.64
+2,L321,3,Tumor,126485,7650,6.05
+3,L321,1,Control,63997,343,0.54
+4,L34,1,Control,57086,287,0.5
+5,L34,3,Tumor,206210,8129,3.94
+6,L34,2,Tumor,267373,9296,3.48

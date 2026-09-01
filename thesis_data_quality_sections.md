@@ -37,31 +37,32 @@ internal calibrators: the custom probe GFAP as a high-dynamic-range positive con
 well-characterised astrocyte transcript), and the housekeeping-like neuronal transcript Meg3 as the
 strongest-detected reference on the panel.
 
-**Table X. Detection reliability of the custom add-on probes, benchmarked against panel reference genes
-(slice 1, non-tumor cells, n = 120,708).** S/N = mean probe counts / mean negative-probe counts; "% cells
-positive" = fraction with ≥1 count; "% signal above background" = fraction of the probe's molecules exceeding
-the cell-specific Poisson background defined by the negative probes.
+**Table 2 | Detection reliability of the custom add-on probes benchmarked against panel reference genes**
 
+| Probe    | Role                     | Mean counts per cell | Max counts per cell | Cells positive (%) | S/N  | Signal above background (%) |
+| -------- | ------------------------ | -------------------- | ------------------- | ------------------ | ---- | --------------------------- |
+| *Custom add-on probes*                                                                                                                            ||||||
+| GFAP     | Positive control (astrocyte) | 0.318            | 90                  | 17.8               | 12.5 | 92                          |
+| tdTomato | Lineage reporter         | 0.341                | 15                  | 21.0               | 13.4 | 93                          |
+| Ccl2     | Chemokine                | 0.256                | 9                   | 17.2               | 10.1 | 90                          |
+| TMEM119  | Microglia                | 0.225                | 14                  | 15.2               | 8.9  | 89                          |
+| Lyve1    | BAM                      | 0.184                | 9                   | 12.9               | 7.2  | 86                          |
+| Trem2    | Myeloid                  | 0.122                | 8                   | 9.0                | 4.8  | 79                          |
+| Cxcl13   | Chemokine                | 0.098                | 6                   | 7.4                | 3.8  | 74                          |
+| **GFP**  | Lineage reporter         | **0.044**            | 4                   | **3.6**            | **1.7** | **42**                   |
+| *Panel reference genes*                                                                                                                           ||||||
+| Meg3     | Reference (neuronal)     | 1.867                | 96                  | 37.8               | 73.4 | 99                          |
+| Pecam1   | Reference (endothelial)  | 0.262                | 22                  | 17.6               | 10.3 | 90                          |
+| Cx3cr1   | Reference (myeloid)      | 0.215                | 8                   | 14.6               | 8.4  | 88                          |
+| Csf1r    | Reference (myeloid)      | 0.128                | 9                   | 9.3                | 5.0  | 80                          |
 
-| Probe    | Class  | Role             | Mean counts/cell | Max | % cells positive | S/N      | % signal above background |        |                  |           |     |         |          |        |
-| -------- | ------ | ---------------- | ---------------- | --- | ---------------- | -------- | ------------------------- | ------ | ---------------- | --------- | --- | ------- | -------- | ------ |
-| GFAP     | custom | positive control | 0.318            | 90  | 17.8             | **12.5** | 92                        |        |                  |           |     |         |          |        |
-| tdTomato | custom | lineage reporter | 0.341            | 15  | 21.0             | 13.4     | 93                        |        |                  |           |     |         |          |        |
-| Ccl2     | custom | chemokine        | 0.256            | 9   | 17.2             | 10.1     | 90                        |        |                  |           |     |         |          |        |
-| TMEM119  | custom | microglia        | 0.225            | 14  | 15.2             | 8.9      | 89                        |        |                  |           |     |         |          |        |
-| Lyve1    | custom | BAM              | 0.184            | 9   | 12.9             | 7.2      | 86                        |        |                  |           |     |         |          |        |
-| Trem2    | custom | myeloid          | 0.122            | 8   | 9.0              | 4.8      | 79                        |        |                  |           |     |         |          |        |
-| Cxcl13   | custom | chemokine        | 0.098            | 6   | 7.4              | 3.9      | 74                        |        |                  |           |     |         |          |        |
-| **GFP**  | custom | lineage reporter | **0.044**        | 4   | **3.6**          | **1.73** | **42**                    |        |                  |           |     |         |          |        |
-| Meg3     | panel  | reference        | 1.868            | 96  | 37.8             | 73.4     | 99                        |        |                  |           |     |         |          |        |
-| Pecam1   | panel  | endothelial ref  | 0.262            | 22  | 17.6             | 10.3     | 90                        |        |                  |           |     |         |          |        |
-| Cx3cr1   | panel  | myeloid ref      | 0.215            | 8   | 14.6             | 8.4      | 88                        |        |                  |           |     |         |          |        |
-| Csf1r    | panel  | myeloid ref      | 0.128            | 9   | 9.3              | 5.0      | Lyve1                     | custom | BAM              | 0.184     | 9   | 12.9    | 7.2      | 86     |
-|          |        |                  |                  |     |                  |          | Trem2                     | custom | myeloid          | 0.122     | 8   | 9.0     | 4.8      | 79     |
-|          |        |                  |                  |     |                  |          | Cxcl13                    | custom | chemokine        | 0.098     | 6   | 7.4     | 3.9      | 74     |
-|          |        |                  |                  |     |                  |          | **GFP**                   | custom | lineage reporter | **0.044** | 4   | **3.6** | **1.73** | **42** |
-|          |        |                  |                  |     |                  |          | Meg3                      | panel  | reference        | 1.868     | 96  | 37.8    | 73.4     | 99     |
-|          |        |                  |                  |     |                  |          | Pecam1                    | panel  | endothelial ref  | 0.262     | 22  | 17.6    | 10.3     | 90     |
+Slice 1, non-tumor cells, *n* = 120,708. Signal-to-noise (S/N) is the mean per-cell probe count divided by
+the mean per-cell count of the 11 negative-control probes (0.025 counts per cell); SystemControl probes are
+optical-decode controls and were excluded. Cells positive is the fraction of cells with at least one count.
+Signal above background is the fraction of a probe's molecules exceeding the cell-specific Poisson background
+defined by the negative-control probes.
+Values in bold identify the GFP probe, the only probe failing every detection criterion.
+BAM, border-associated macrophage; S/N, signal-to-noise.
 
 
 The GFP reporter emerged as a failed probe. Its S/N of 1.73 is more than seven-fold below the GFAP

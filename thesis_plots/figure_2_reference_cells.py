@@ -63,11 +63,8 @@ def _load_slide(slide_id: str):
 
 
 def make_figure(out_path: pathlib.Path):
+    # No figure title: the caption carries it in the thesis.
     fig, axes = plt.subplots(1, 2, figsize=(16, 11))
-    fig.suptitle(
-        "Reference cells for supervised refinement of tumor calls",
-        fontsize=16, fontweight="bold", y=0.99,
-    )
 
     summary = []
     for ax, slide_id in zip(axes, ["L321", "L34"]):
@@ -135,7 +132,7 @@ def make_figure(out_path: pathlib.Path):
     fig.legend(handles=handles, loc="lower center", ncol=3,
                frameon=False, fontsize=10.5, bbox_to_anchor=(0.5, 0.01))
 
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.tight_layout(rect=[0, 0.05, 1, 1])
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     print(f"saved: {out_path}\n")
 

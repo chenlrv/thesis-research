@@ -32,13 +32,12 @@ import scanpy as sc
 from scipy.io import mmread, mmwrite
 from scipy.sparse import csc_matrix, csr_matrix
 
+# All six slices are processed with the same grouping, so that the population prior
+# supplied to decontX is constructed identically everywhere (earlier runs mixed a
+# coarse Leiden partition on slices 1 and 3 with a 25-cluster partition elsewhere).
 SLICES = {
-    # Slices 1 & 3 already done. Adding 2/4/5/6; the whole-slice Leiden (z prior) OOMs
-    # on the large slices, so WRITE_CLUSTERS=False lets decontX self-cluster instead.
-    "slice_2": "D:/thesis-research/resources/cache/with_tumor_prediction/slice_2_adata.h5ad",
-    "slice_4": "D:/thesis-research/resources/cache/with_tumor_prediction/slice_4_adata.h5ad",
-    "slice_5": "D:/thesis-research/resources/cache/with_tumor_prediction/slice_5_adata.h5ad",
-    "slice_6": "D:/thesis-research/resources/cache/with_tumor_prediction/slice_6_adata.h5ad",
+    f"slice_{i}": f"D:/thesis-research/resources/cache/with_tumor_prediction/slice_{i}_adata.h5ad"
+    for i in (1, 2, 3, 4, 5, 6)
 }
 OUT_DIR = "D:/thesis-research/resources/cache/decontx"
 R_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_decontx.R")
@@ -46,8 +45,9 @@ RSCRIPT = ""   # set to the full path of Rscript.exe to override autodetection (
 TUMOR_COL = "pred_tumor_XGBoost"
 COARSE_RES = 0.5
 CONTROL_PREFIXES = ("neg", "negprb", "blank", "falsecode", "systemcontrol")
-WRITE_CLUSTERS = False      # False -> decontX self-clusters (avoids whole-slice Leiden OOM)
-MAX_LEIDEN_CELLS = 120000   # only attempt Leiden z below this size (when WRITE_CLUSTERS)
+WRITE_CLUSTERS = True       # supply a coarse Leiden partition as decontX's z prior
+# Whole-slice Leiden exceeds available memory on slices 5 and 6; the cluster
+# labels for those slices are provided as deposited inputs (clusters.csv).
 
 
 def _decode(a):
@@ -175,7 +175,7 @@ def export_slice(name, path):
 
     mmwrite(os.path.join(work, "counts.mtx"), adata.X.T.tocsr().astype(np.int32))
     cfile = os.path.join(work, "clusters.csv")
-    if WRITE_CLUSTERS and adata.n_obs <= MAX_LEIDEN_CELLS:
+    if WRITE_CLUSTERS:
         print(f"{name}: {adata.shape}; coarse Leiden for decontX z ...")
         z = coarse_clusters(adata)
         pd.DataFrame({"cluster": z}).to_csv(cfile, index=False)
